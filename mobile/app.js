@@ -1036,6 +1036,12 @@ async function again() {
 }
 
 $("#btn-start").addEventListener("click", () => start(true));
+/* Safari ignores overscroll-behavior on a page that does not scroll: a drag starting on the practice screen (outside a
+ * card whose words overflow) would rubber-band the page or pull it to refresh mid-letter. Taps are untouched. */
+$("#practice").addEventListener("touchmove", (e) => {
+  const c = e.target.closest?.("#exp-mount .tutor-main, .setup-card");
+  if (!c || c.scrollHeight <= c.clientHeight) e.preventDefault();
+}, { passive: false });
 // a double tap on Skip must not skip the next letter too
 $("#btn-skip").addEventListener("click", () => { if (performance.now() - trialStartedAt > 700) endCurrent?.("skipped"); });
 $("#btn-close").addEventListener("click", () => { $("#quit-sheet").hidden = false; $("#btn-keep").focus(); });
