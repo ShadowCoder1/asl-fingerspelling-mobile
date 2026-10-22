@@ -50,7 +50,9 @@ html, body {
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
-body { overscroll-behavior: none; }
+html, body { overscroll-behavior: none; }
+.screen-practice .topbar, .screen-practice .stage-wrap { touch-action: none; }
+#exp-mount .tutor-main, .setup-card { overscroll-behavior: contain; }
 button { font: inherit; color: inherit; touch-action: manipulation; }
 h1 { font-size: clamp(1.6rem, 7vw, 2.1rem); line-height: 1.15; font-weight: 800; letter-spacing: -0.015em; margin: 0; }
 
@@ -196,7 +198,8 @@ html.src-mirror #overlay { transform: scaleX(-1); }
 .perf { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.55); color: #fff; font: 600 11px/1.4 ui-monospace, Menlo, monospace; white-space: nowrap; pointer-events: none; }
 
 /* the letter with its hold ring, and the letter's picture, on the camera view (moved here by app.js) */
-.hud { position: absolute; inset: 0; pointer-events: none; --hud-ring: 76px; --hud-ring: clamp(66px, 21cqw, 92px); }
+.hud { position: absolute; inset: 0; pointer-events: none; --hud-ring: 76px; }
+@supports (width: 1cqw) { .hud { --hud-ring: clamp(66px, 21cqw, 92px); } }
 body:not(.phase-practice) .hud { visibility: hidden; }
 .hud .tutor-cue-wrap {
   position: absolute; top: 10px; left: 10px;
@@ -279,7 +282,8 @@ html.is-phone .setup-card .demo-flip { display: none !important; }
 @media (min-width: 1000px) and (orientation: landscape) {
   .screen-practice { max-width: 1240px; margin: 0 auto; }
   .topbar { height: 64px; padding: 0 16px; }
-  .hud { --hud-ring: 100px; --hud-ring: clamp(80px, 15cqw, 120px); }
+  .hud { --hud-ring: 100px; }
+  @supports (width: 1cqw) { .hud { --hud-ring: clamp(80px, 15cqw, 120px); } }
   .hud .tutor-cue-wrap { top: 14px; left: 14px; }
   .hud .tutor-reference { width: 120px; width: clamp(96px, 16cqw, 150px); top: 14px; left: calc(24px + var(--hud-ring)); }
   html.hand-left .hud .tutor-cue-wrap { left: auto; right: 14px; }

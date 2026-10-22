@@ -68,6 +68,9 @@ const SEEN_GRACE_MS = 250;
 /* No hand for this long in the camera check: say what usually fixes it. */
 const CHECK_HINT_MS = 8000;
 const NO_HAND_HINT = "We can't see a hand yet. Move somewhere brighter, and keep your whole hand in the picture.";
+/* iOS 17+ draws "Reactions" (balloons for a V, a bubble for a thumbs-up) into the camera picture; only the person can
+ * turn them off, in Control Center. Said in the camera check when a letter of this session can set one off. */
+const REACTIONS_NOTE = "If balloons or bubbles pop up on the camera, swipe down to Control Center, tap Video Effects and turn Reactions off.";
 const AUTOSTART_KEY = "asl-mobile-autostart";
 const SOUND_KEY = "asl-mobile-sound";
 /* asl-demo.js's own frame budget for the camera (js/core/experiment.js asks config.js RECORDING.video, 640 x 480). */
@@ -428,7 +431,8 @@ let resuming = null;
 /* After a lock, an app switch or a stall: play again, or reopen the camera (`force`: even if the track says it is
  * live). A camera just let go by another app can refuse once, so a reopen is tried three times before the error page. */
 function resumeCamera(force = false) {
-  resuming ??= (async () => {
+  if (resuming) return resuming;
+  resuming = (async () => {
     try {
       const track = stream?.getVideoTracks()[0];
       if (force || !track || track.readyState === "ended") {
@@ -443,8 +447,8 @@ function resumeCamera(force = false) {
       }
     } catch (err) {
       fail(err);
-    } finally { resuming = null; }
-  })();
+    }
+  })().finally(() => { resuming = null; });
   return resuming;
 }
 
@@ -559,6 +563,7 @@ function rebuildTracker(err) {
   if (rebuilding) return;
   if (REPLAY.valid || (stats.rebuilt ?? 0) >= 2) { fail(err); return; }
   rebuilding = (async () => {
+    await null;
     stageMessage("Restarting the hand tracker…");
     try {
       const t = await createTracker(exp.tracker ?? "hand", { ...(exp.trackerOptions ?? {}) });
@@ -651,6 +656,7 @@ async function cameraCheck() {
       if (objection) say(PHONE ? `That looks like your ${OTHER} hand. Hold the phone in your ${OTHER} hand, and hold up your ${HAND}.` : objection, "bad");
       else if (small) say("Bring your hand a little closer to the camera.", "bad");
       else if (present) say("Hold it there…", "good");
+      else if (IOS && /[VA]/.test(LETTERS_ASKED.join("")) && now - lastHandAt > CHECK_HINT_MS / 2) say(REACTIONS_NOTE);
       else say(now - lastHandAt > CHECK_HINT_MS ? NO_HAND_HINT : "Hold it up in front of the camera, where you can see it on screen.");
     }
     await clock.next();
@@ -893,7 +899,7 @@ async function keepAwake() {
 function releaseAwake() { try { wake?.release(); } catch { /* already gone */ } wake = null; }
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
-  if (stats.screen === "practice" && stream && !REPLAY.valid) { keepAwake(); resumeCamera(); }
+  if (stats.screen === "practice" && stream && !REPLAY.valid) { aliveAt = performance.now(); keepAwake(); resumeCamera(); }
   if (audio?.state === "suspended") audio.resume().catch(() => {});
 });
 // back to a page restored from the browser's memory: the camera is gone, start clean
@@ -940,7 +946,7 @@ async function start(tapped = true) {
   if (started) return;
   if (loadError && stats.screen === "welcome") { location.reload(); return; }
   started = true;
-  if (tapped) { keepAwake(); unlockAudio(); }
+  if (tapped) { keepAwake(); unlockAudio(); guardBack(); }
   if (planError) return fail(planError);
   show("practice");
   phase("setup");
@@ -962,6 +968,7 @@ async function waitForTap() {
   title.textContent = `Hold up your ${HAND} hand`;
   keepAwake();
   unlockAudio();
+  guardBack();
 }
 /* The camera, the camera check and the letters (again from "Practice again", with the tracker kept). */
 async function session() {
@@ -997,12 +1004,24 @@ async function session() {
   stageMessage(null);
   await practice();
 }
+/* Back during the camera check or the letters (an Android edge swipe brushed while holding the phone; in Slack's or
+ * Gmail's browser it would close the page) opens "Stop practicing?" instead of leaving. */
+function guardBack() {
+  try { if (history.state?.practice !== 1) history.pushState({ practice: 1 }, ""); } catch { /* no history API */ }
+}
+addEventListener("popstate", () => {
+  if (stats.screen !== "practice") return;
+  guardBack();
+  $("#quit-sheet").hidden = false;
+  $("#btn-keep").focus({ preventScroll: true });
+});
 /* "Practice again": the same page and the same tracker (no download, no compile, no warm-up, no new page to grant the
  * camera and sound to), the experiment's own files fetched again by nextTrial(0), the camera reopened inside the tap. */
 async function again() {
   if (!tracker || REPLAY.valid) { location.reload(); return; }
   keepAwake();
   unlockAudio();
+  guardBack();
   stats.summaries.length = 0;
   stats.accepted.length = 0;
   doneCount = 0;
@@ -1023,7 +1042,7 @@ $("#btn-close").addEventListener("click", () => { $("#quit-sheet").hidden = fals
 const closeSheet = () => { $("#quit-sheet").hidden = true; $("#btn-close").focus({ preventScroll: true }); };
 $("#btn-keep").addEventListener("click", closeSheet);
 $("#quit-sheet").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeSheet(); });
-$("#btn-quit").addEventListener("click", () => { stopCamera(); location.reload(); });
+$("#btn-quit").addEventListener("click", () => { stopCamera(); location.replace(location.href); });
 $("#btn-sound").addEventListener("click", () => {
   soundOn = !soundOn;
   try { localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); } catch { /* this visit only */ }
