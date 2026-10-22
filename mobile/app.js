@@ -24,17 +24,17 @@
  *     app was opened, and an in-app browser (Instagram, LinkedIn...) or a blocked camera gets steps that fix it.
  *   - A chime and a buzz when a letter is made (sound can be switched off; it is remembered).
  *
- * WHAT IT DOES NOT HAVE. OpenFS's second opinion on I, M, N and X (tutor/mix.js SECOND_OPINION): its weights are
- * 16 MB, its licence is non-commercial research only, and it reads the whole trial clip on the main thread at a
- * rejected hold (~3 ms a frame on a laptop, several times that on a phone: a visible freeze). The site is built
- * without them, so loadOpenFS() fails at once and the demo grades exactly as it does whenever OpenFS has not loaded.
- * Its effect on the experts' signs was on M (6 of the 13 signs the fixes changed); none of the three default letters.
+ * THE SAME GRADER AS EVERY OTHER VERSION: tutor/model.json, tutor/mix.js's rules and OpenFS's second opinion on I, M, N
+ * and X (its 16 MB of weights load after the hand tracker; a letter it grades waits for them). OpenFS reads the whole
+ * trial clip on the main thread at a rejected hold of those letters: ~0.1 s for a short try, ~1 s for 300 frames on a
+ * laptop, somewhat more on a phone (the video keeps playing meanwhile).
  *
  * URL: everything asl-demo.js takes (?letters=, ?reps=, ?hand=left, ?look=outline, ?srcmirror=1, ...), plus
  *      ?fps=1 (frame rate and per-frame cost on the camera view), ?replay=<file.json> (a recorded session instead of
  *      the camera, for tests; js/core/replay.js). */
 
-import exp, { DEFAULT_LETTERS, parseDemoLetters, parseDemoReps, demoPlan, LOAD } from "../experiments/asl-demo.js";
+import exp, { DEFAULT_LETTERS, parseDemoLetters, parseDemoReps, demoPlan, LOAD, openfsLoaded } from "../experiments/asl-demo.js";
+import { SECOND_OPINION } from "../tutor/mix.js";
 import { createTracker } from "../js/core/tracker.js";
 import { MEDIAPIPE } from "../config.js";
 import { runTrialLoop } from "../js/core/trial-loop.js";
@@ -179,7 +179,7 @@ async function renderWelcome() {
     ? `Copy each letter's picture with your ${HAND} hand. Your camera checks your handshape.`
     : `Make each letter with your ${HAND} hand. Your camera checks your handshape and shows you what to change, as you go.`;
   if (PLAIN) {
-    $("#step-fit").innerHTML = `Copy the letter's picture with your <b>${HAND}</b> hand.`;
+    $("#step-fit").innerHTML = `Copy the letter's picture with your <b>${HAND}</b> hand. The blue lines are your hand.`;
     $("#step-hold").textContent = "Then hold still until the ring around the letter fills.";
   }
   const hero = $("#hero");
@@ -288,6 +288,7 @@ const trackerReady = (async () => {
     modelAssetBuffer: model,
   });
   stats.delegate = tracker.delegate;
+  openfsLoaded().then((o) => { stats.openfs = !!o; });
   await warmUp(tracker);
   setLoad(1, "Ready");
   if (SHOW_PERF) $("#loadline-text").textContent = `Hand tracker ready: ${tracker.delegate}${stats.warm ? ", warmed up" : ""}`;
@@ -332,6 +333,12 @@ async function warmUp(tracker) {
 const video = $("#cam");
 const canvas = $("#overlay");
 const ctx = canvas.getContext("2d");
+/* The same grader as every other version (tutor/model.json, tutor/mix.js's rules and OpenFS's second opinion on
+ * I, M, N and X): the hand tracker downloads first, then OpenFS's weights, and a letter OpenFS grades waits for them
+ * (practice() below) instead of the first letter waiting up to 10 s. No outline art for glove letters (never drawn). */
+LOAD.pictureArtForGloveLetters = false;
+LOAD.openfsAtMount = false;
+LOAD.openfsWaitMs = 0;
 exp.mount($("#exp-mount"), { participant: {}, demographics: {}, condition: null, video: { width: CAMERA.height, height: CAMERA.width, aspect: 0.75 } });
 /* The letter with its ring and the letter's picture go ON the camera view (outside the mirrored box, so they read the
  * right way round). The tutor keeps its own references to these nodes, so moving them changes nothing it does. */
@@ -340,7 +347,6 @@ const cueWrap = $("#exp-mount .tutor-cue-wrap");
 const reference = $("#tutor-reference");
 if (cueWrap) hud.append(cueWrap);
 if (reference) hud.append(reference);
-LOAD.pictureArtForGloveLetters = false;
 let firstTrial = planError ? Promise.reject(planError) : exp.nextTrial(0);
 firstTrial.catch((err) => { if (!planError) loadFailed(err); });
 
@@ -777,6 +783,7 @@ async function practice() {
   let i = 0;
   let trial = await firstTrial;
   while (trial) {
+    if (SECOND_OPINION.letters.includes(trial.letter) && stats.openfs === undefined) await waitForOpenFS();
     const state = exp.onTrialStart?.(trial, { tracker }) ?? {};
     currentIndex = i;
     const endReason = await recordTrial(trial, state);
@@ -791,6 +798,15 @@ async function practice() {
   finish();
 }
 let currentIndex = 0;
+/* Before a letter OpenFS grades: its weights, if they are still on their way (they start after the hand tracker). If
+ * they cannot load, the letter goes ahead as it would on the laptop without them. */
+async function waitForOpenFS() {
+  if (REPLAY.valid) { stats.openfs = !!(await Promise.race([openfsLoaded(), sleep(20000)])); return; }
+  stageMessage("Getting the next letter ready…");
+  const o = await Promise.race([openfsLoaded(), sleep(45000).then(() => null)]);
+  stats.openfs = !!o;
+  stageMessage(null);
+}
 
 /* "Good job" (the tutor's correct tone) and a new letter: a chime, the bar moves, the letter pops in */
 new MutationObserver(() => {

@@ -6,7 +6,7 @@ The phone version of the fingerspelling practice demo: open the link on a phone 
 make each letter with your hand. A glove (or the letter's outline) is drawn in the camera view for your hand to fit
 into, with your own hand's skeleton inside it; it turns green when the handshape is right, a ring fills while you hold
 still, and after a miss it says which letter your hand looked like and what to change. Hand tracking is Google's
-MediaPipe; the grader is a small statistical model fitted on public, openly licensed hand-landmark datasets
+MediaPipe; the grader is a small statistical model fitted on public, openly licensed hand-landmark datasets, with OpenFS (KETI) as a second opinion on a few letters, for non-commercial research
 (attributions inside `tutor/model.json`). Everything runs on the device and nothing is recorded or saved.
 
 This teaches fingerspelling handshapes, not ASL. To learn ASL, learn from Deaf teachers. Grading is approximate and

@@ -1,0 +1,325 @@
+{
+"floats": 4105021,
+"d_model": 256,
+"nhead": 8,
+"layers": 3,
+"classes": 61,
+"tensors": {
+"rec.pose_embedding.0.weight": {
+"offset": 0,
+"shape": [
+256,
+42
+]
+},
+"rec.pose_embedding.0.bias": {
+"offset": 10752,
+"shape": [
+256
+]
+},
+"rec.pose_embedding.1.weight": {
+"offset": 11008,
+"shape": [
+256
+]
+},
+"rec.pose_embedding.1.bias": {
+"offset": 11264,
+"shape": [
+256
+]
+},
+"rec.pose_embedding.3.weight": {
+"offset": 11520,
+"shape": [
+256,
+256
+]
+},
+"rec.pose_embedding.3.bias": {
+"offset": 77056,
+"shape": [
+256
+]
+},
+"rec.pose_embedding.4.weight": {
+"offset": 77312,
+"shape": [
+256
+]
+},
+"rec.pose_embedding.4.bias": {
+"offset": 77568,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.0.self_attn.in_proj_weight": {
+"offset": 77824,
+"shape": [
+768,
+256
+]
+},
+"rec.encoder.layers.0.self_attn.in_proj_bias": {
+"offset": 274432,
+"shape": [
+768
+]
+},
+"rec.encoder.layers.0.self_attn.out_proj.weight": {
+"offset": 275200,
+"shape": [
+256,
+256
+]
+},
+"rec.encoder.layers.0.self_attn.out_proj.bias": {
+"offset": 340736,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.0.linear1.weight": {
+"offset": 340992,
+"shape": [
+2048,
+256
+]
+},
+"rec.encoder.layers.0.linear1.bias": {
+"offset": 865280,
+"shape": [
+2048
+]
+},
+"rec.encoder.layers.0.linear2.weight": {
+"offset": 867328,
+"shape": [
+256,
+2048
+]
+},
+"rec.encoder.layers.0.linear2.bias": {
+"offset": 1391616,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.0.norm1.weight": {
+"offset": 1391872,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.0.norm1.bias": {
+"offset": 1392128,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.0.norm2.weight": {
+"offset": 1392384,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.0.norm2.bias": {
+"offset": 1392640,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.1.self_attn.in_proj_weight": {
+"offset": 1392896,
+"shape": [
+768,
+256
+]
+},
+"rec.encoder.layers.1.self_attn.in_proj_bias": {
+"offset": 1589504,
+"shape": [
+768
+]
+},
+"rec.encoder.layers.1.self_attn.out_proj.weight": {
+"offset": 1590272,
+"shape": [
+256,
+256
+]
+},
+"rec.encoder.layers.1.self_attn.out_proj.bias": {
+"offset": 1655808,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.1.linear1.weight": {
+"offset": 1656064,
+"shape": [
+2048,
+256
+]
+},
+"rec.encoder.layers.1.linear1.bias": {
+"offset": 2180352,
+"shape": [
+2048
+]
+},
+"rec.encoder.layers.1.linear2.weight": {
+"offset": 2182400,
+"shape": [
+256,
+2048
+]
+},
+"rec.encoder.layers.1.linear2.bias": {
+"offset": 2706688,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.1.norm1.weight": {
+"offset": 2706944,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.1.norm1.bias": {
+"offset": 2707200,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.1.norm2.weight": {
+"offset": 2707456,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.1.norm2.bias": {
+"offset": 2707712,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.2.self_attn.in_proj_weight": {
+"offset": 2707968,
+"shape": [
+768,
+256
+]
+},
+"rec.encoder.layers.2.self_attn.in_proj_bias": {
+"offset": 2904576,
+"shape": [
+768
+]
+},
+"rec.encoder.layers.2.self_attn.out_proj.weight": {
+"offset": 2905344,
+"shape": [
+256,
+256
+]
+},
+"rec.encoder.layers.2.self_attn.out_proj.bias": {
+"offset": 2970880,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.2.linear1.weight": {
+"offset": 2971136,
+"shape": [
+2048,
+256
+]
+},
+"rec.encoder.layers.2.linear1.bias": {
+"offset": 3495424,
+"shape": [
+2048
+]
+},
+"rec.encoder.layers.2.linear2.weight": {
+"offset": 3497472,
+"shape": [
+256,
+2048
+]
+},
+"rec.encoder.layers.2.linear2.bias": {
+"offset": 4021760,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.2.norm1.weight": {
+"offset": 4022016,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.2.norm1.bias": {
+"offset": 4022272,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.2.norm2.weight": {
+"offset": 4022528,
+"shape": [
+256
+]
+},
+"rec.encoder.layers.2.norm2.bias": {
+"offset": 4022784,
+"shape": [
+256
+]
+},
+"cls.linear.0.weight": {
+"offset": 4023040,
+"shape": [
+256,
+256
+]
+},
+"cls.linear.0.bias": {
+"offset": 4088576,
+"shape": [
+256
+]
+},
+"cls.linear.1.weight": {
+"offset": 4088832,
+"shape": [
+256
+]
+},
+"cls.linear.1.bias": {
+"offset": 4089088,
+"shape": [
+256
+]
+},
+"cls.linear.4.weight": {
+"offset": 4089344,
+"shape": [
+61,
+256
+]
+},
+"cls.linear.4.bias": {
+"offset": 4104960,
+"shape": [
+61
+]
+}
+}
+}

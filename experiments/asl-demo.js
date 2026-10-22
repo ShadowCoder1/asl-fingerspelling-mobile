@@ -52,7 +52,10 @@ export const DEMO_VERSION = "asl-demo/3";
  * though with the glove look it is never drawn (the laptop has always built it). The phone version (mobile/app.js) turns
  * it off: rasterising and schematizing each picture is a long task on a phone's main thread. Drawing and grading are the
  * same either way. */
-export const LOAD = { pictureArtForGloveLetters: true };
+export const LOAD = { pictureArtForGloveLetters: true, openfsAtMount: true, openfsWaitMs: 10000 };
+/* openfsAtMount / openfsWaitMs (OPENFS_WAIT_MS): when the second opinion's weights (16 MB) start loading, and how long
+ * the first letter waits for them. The phone version starts them after its hand tracker and waits for them before any
+ * letter they grade instead (openfsLoaded below; mobile/app.js), so those letters always get the same grader. */
 const MODEL_PATH = "tutor/model.json";
 const GHOST_PATH = "tutor/ghost-hands.json";
 const PICTURES_PATH = "tutor/ghost-pictures.json";
@@ -143,9 +146,9 @@ const debugOn = params.get("debug") === "1";
  * the whole picture; ?look=hand, the outline of a real hand (experiments/asl-tutor/ghost.js). */
 const LOOK_STYLE = ["outline", "picture", "hand", "plain"].includes(params.get("look")) ? params.get("look") : "glove";
 /* ?look=plain (the phone version's version without a glove, 22 Oct; the owner: "the simple clean version where it shows
- * them the letter and they sign it ... none of the yellow feedback"): nothing drawn to fit the hand into and no live
- * coaching -- the letter, its picture and the hold ring; a hold that is not the letter is answered "Not quite. Try
- * again." instead of what to change. When a hold is taken and how it is graded are exactly as in the other looks. */
+ * them the letter and they sign it ... none of the yellow feedback"; "i want the pose diagram on the hand"): nothing
+ * drawn to fit the hand into and no live coaching -- the letter, its picture, the learner's own hand skeleton and the
+ * hold ring; a hold that is not the letter is answered "Not quite. Try again." instead of what to change. When a hold is taken and how it is graded are exactly as in the other looks. */
 const PLAIN = LOOK_STYLE === "plain";
 export const PLAIN_RETRY = "Not quite. Try again.";
 const gloveFor = (letter) => LOOK_STYLE === "glove" && !!session?.glove?.has(letter);
@@ -179,6 +182,8 @@ export const FROM_MEMORY_MOTION = Object.freeze({
 
 let session = null, view = null, debug = null, mountError = null, picker = null, focus = null, meters = null, notesView = null;
 let openfsReady = null, openfsPromise = null;
+/** The second opinion's weights, loading (started on the first call); resolves to the model, or null if they failed. */
+export const openfsLoaded = () => startOpenFS();
 function startOpenFS() {
   openfsPromise ??= loadOpenFS().then((o) => { openfsReady = o; return o; }).catch((err) => {
     console.warn(`asl-demo: OpenFS not loaded, grading without its second opinion (${err?.message || err})`);
@@ -288,7 +293,7 @@ export default {
     document.addEventListener("keydown", onKey);
     // the platform's end-of-demo download button and its note are for researchers, not for this page
     document.documentElement.classList.add("asl-demo");
-    startOpenFS();
+    if (LOAD.openfsAtMount) startOpenFS();
   },
 
   async nextTrial(index) {
@@ -354,8 +359,7 @@ export default {
         session.ghost.draw(ctx, canvas, landmarks, trial.letter, HAND, strength, session.look, performance.now());
       }
     }
-    // the plain look draws nothing on the camera during a letter (the camera check still shows the hand is tracked)
-    if (!(PLAIN && trial) && (DOTS || !session?.ghostOn)) drawHand(ctx, canvas, landmarks);
+    if (DOTS || !session?.ghostOn) drawHand(ctx, canvas, landmarks);
     // J and Z: the stroke to draw, from the fingertip, and the fingertip's own trail -- on top of the skeleton
     if (session.ghostOn && trial) safely("J/Z path", () => session.motionGuide?.draw(ctx, canvas, landmarks, trial.letter, performance.now(), guidance()));
   },
@@ -549,9 +553,11 @@ async function loadEverything() {
   }
   session.motionGuide = createMotionGuide({ hand: HAND });
   session.coach = createCoach(session.model, { hand: HAND, bThumb: true, looksLike: true, levels: () => !!meters?.shown });
-  let timer;
-  await Promise.race([startOpenFS(), new Promise((r) => { timer = setTimeout(r, OPENFS_WAIT_MS); })]);
-  clearTimeout(timer);
+  if (LOAD.openfsWaitMs > 0) {
+    let timer;
+    await Promise.race([startOpenFS(), new Promise((r) => { timer = setTimeout(r, LOAD.openfsWaitMs); })]);
+    clearTimeout(timer);
+  }
   // EXACTLY the study's practice: its ring (0.9 s still), its grader, its hints. (The first demo used the expert ring,
   // 1.5 s after a 0.5 s settle: on the same real footage it took 10 letters where the study's practice took 16, and
   // Indranil and the owner both struggled to get to the next letter, 19 Oct.)
