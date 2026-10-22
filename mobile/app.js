@@ -720,7 +720,7 @@ async function start() {
       stageMessage(null);
     } else {
       stageMessage("Starting your camera…");
-      $("#setup-status").textContent = "Starting your camera…";
+      $("#setup-status").textContent = "Tap Allow when your browser asks to use the camera.";
       await openCamera();
       sourceSize(video);
       layout();
