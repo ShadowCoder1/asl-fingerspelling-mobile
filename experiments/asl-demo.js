@@ -318,6 +318,7 @@ export default {
     meters?.idle("JZ".includes(trial.letter));   // a movement has no finger levels: the panel stands aside
     session.trialLog = { misses: 0, looks: [] };
     session.trial = trial;
+    session.celebratedAt = null;
     session.look = null;
     setLive(null);
     debug?.trialStart(trial);
@@ -359,7 +360,9 @@ export default {
         session.ghost.draw(ctx, canvas, landmarks, trial.letter, HAND, strength, session.look, performance.now());
       }
     }
-    if (DOTS || !session?.ghostOn) drawHand(ctx, canvas, landmarks);
+    if (DOTS || !session?.ghostOn) {
+      drawHand(ctx, canvas, landmarks, PLAIN && trial && session.celebratedAt != null ? performance.now() - session.celebratedAt : null);
+    }
     // J and Z: the stroke to draw, from the fingertip, and the fingertip's own trail -- on top of the skeleton
     if (session.ghostOn && trial) safely("J/Z path", () => session.motionGuide?.draw(ctx, canvas, landmarks, trial.letter, performance.now(), guidance()));
   },
@@ -573,7 +576,10 @@ function applyEffects(effects, { trial, addEvent, endTrial }) {
       case "cue": view.cue(e); break;
       case "feedback":
         view.feedback(PLAIN && e.tone === "correction" ? { ...e, text: PLAIN_RETRY, tone: "neutral" } : e, trial.letter);
-        if (e.tone === "correct") { session.coach.accepted(); setLive(session.coach.look); session.glove?.celebrate(performance.now()); }
+        if (e.tone === "correct") {
+          session.coach.accepted(); setLive(session.coach.look); session.glove?.celebrate(performance.now());
+          if (PLAIN) session.celebratedAt = performance.now();
+        }
         break;
       case "status": view.status(e.text); break;
       case "reward": view.reward(e.points); break;
@@ -599,18 +605,67 @@ function applyEffects(effects, { trial, addEvent, endTrial }) {
 const BONES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12],
   [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]];
 /* The learner's tracked hand: a sky-blue skeleton with white joints, over the outline, so the two can be told apart
- * (js/core/experiment.js drawLandmarks would clear the outline away). */
-function drawHand(ctx, canvas, lm) {
+ * (js/core/experiment.js drawLandmarks would clear the outline away).
+ *
+ * `sinceMs` (the plain look, once the letter is made; the owner, 22 Oct: "when they get it right, it turns green with a
+ * cute non distracting animation"): the skeleton turns green in 150 ms and stays green until the next letter; the
+ * joints give one small bounce (and a smaller second one, settled by ~0.5 s); one soft ring leaves the palm and the
+ * fingertips twinkle once, all inside the accepted letter's dwell. With reduced motion it only turns green. */
+const SKY = [56, 189, 248], MINT = [34, 197, 94];
+export const CELEBRATE = Object.freeze({ greenMs: 150, ringMs: 650, twinkleMs: 520 });
+const REDUCED_MOTION = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+/* One bump up and back by 260 ms, then a smaller one by 480 ms: 0..1. */
+export function celebratePop(ms) {
+  if (!(ms >= 0)) return 0;
+  if (ms < 260) return Math.sin(Math.PI * (ms / 260)) * Math.exp(-ms / 300);
+  if (ms < 480) return 0.3 * Math.sin(Math.PI * ((ms - 260) / 220)) * Math.exp(-(ms - 260) / 250);
+  return 0;
+}
+function drawHand(ctx, canvas, lm, sinceMs = null) {
   if (!lm || lm.length !== 21) return;
   const W = canvas.width, H = canvas.height, s = Math.max(1.8, H / 300);
+  const won = sinceMs !== null && sinceMs >= 0;
+  const green = won ? Math.min(1, sinceMs / CELEBRATE.greenMs) : 0;
+  const col = SKY.map((c, i) => Math.round(c + (MINT[i] - c) * green)).join(", ");
+  const pop = won && !REDUCED_MOTION ? celebratePop(sinceMs) : 0;
   ctx.save();
   ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(56, 189, 248, 0.95)";
-  ctx.lineWidth = s;
-  ctx.beginPath();
-  for (const [a, b] of BONES) { ctx.moveTo(lm[a].x * W, lm[a].y * H); ctx.lineTo(lm[b].x * W, lm[b].y * H); }
-  ctx.stroke();
+  ctx.lineJoin = "round";
+  const bones = () => { ctx.beginPath(); for (const [a, b] of BONES) { ctx.moveTo(lm[a].x * W, lm[a].y * H); ctx.lineTo(lm[b].x * W, lm[b].y * H); } };
+  if (green > 0) {
+    // a soft green glow under the lines (a wide faint stroke: no per-frame blur)
+    ctx.strokeStyle = `rgba(${MINT.join(", ")}, ${(0.3 * green).toFixed(3)})`;
+    ctx.lineWidth = s * (3.4 + 1.2 * pop);
+    bones(); ctx.stroke();
+  }
+  ctx.strokeStyle = `rgba(${col}, 0.95)`;
+  ctx.lineWidth = s * (1 + 0.35 * pop + 0.5 * green);
+  bones(); ctx.stroke();
   ctx.fillStyle = "#ffffff";
-  for (const p of lm) { ctx.beginPath(); ctx.arc(p.x * W, p.y * H, 1.6 * s, 0, 2 * Math.PI); ctx.fill(); }
+  const r = 1.6 * s * (1 + 0.7 * pop + 0.1 * green);
+  for (const p of lm) { ctx.beginPath(); ctx.arc(p.x * W, p.y * H, r, 0, 2 * Math.PI); ctx.fill(); }
+  if (won && !REDUCED_MOTION) {
+    const palm = Math.hypot((lm[9].x - lm[0].x) * W, (lm[9].y - lm[0].y) * H);
+    // one soft ring from the middle of the palm
+    if (sinceMs < CELEBRATE.ringMs) {
+      const k = sinceMs / CELEBRATE.ringMs, ease = 1 - (1 - k) ** 3;
+      const cx = [0, 5, 9, 13, 17].reduce((a, i) => a + lm[i].x, 0) / 5 * W, cy = [0, 5, 9, 13, 17].reduce((a, i) => a + lm[i].y, 0) / 5 * H;
+      ctx.strokeStyle = `rgba(${MINT.join(", ")}, ${(0.55 * (1 - k)).toFixed(3)})`;
+      ctx.lineWidth = s * 1.6;
+      ctx.beginPath(); ctx.arc(cx, cy, palm * (0.9 + 1.5 * ease), 0, 2 * Math.PI); ctx.stroke();
+    }
+    // a twinkle at each fingertip
+    if (sinceMs < CELEBRATE.twinkleMs) {
+      const k = sinceMs / CELEBRATE.twinkleMs, size = s * 3.2 * Math.sin(Math.PI * k);
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * (1 - k)).toFixed(3)})`;
+      for (const i of [4, 8, 12, 16, 20]) {
+        const x = lm[i].x * W, y = lm[i].y * H;
+        ctx.beginPath();
+        ctx.moveTo(x, y - size); ctx.lineTo(x + size * 0.28, y - size * 0.28); ctx.lineTo(x + size, y); ctx.lineTo(x + size * 0.28, y + size * 0.28);
+        ctx.lineTo(x, y + size); ctx.lineTo(x - size * 0.28, y + size * 0.28); ctx.lineTo(x - size, y); ctx.lineTo(x - size * 0.28, y - size * 0.28);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
   ctx.restore();
 }
