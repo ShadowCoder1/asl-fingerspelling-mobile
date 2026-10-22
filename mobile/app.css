@@ -112,10 +112,6 @@ h1:focus { outline: none; }
 #btn-sound[aria-pressed="false"] .ico-sound-off { display: block; }
 
 /* ---- welcome ----------------------------------------------------------------------------------------------------- */
-.pill {
-  align-self: flex-start; margin: 0; padding: 4px 12px; border-radius: 999px;
-  background: var(--soft); color: var(--subtle); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.03em;
-}
 .hero { display: flex; justify-content: center; align-items: flex-end; gap: 10px; min-height: 124px; margin: 4px 0 2px; }
 .hero-tile {
   position: relative; width: min(28%, 108px); aspect-ratio: 1 / 1.08; border-radius: 22px;
