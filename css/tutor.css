@@ -1,0 +1,588 @@
+/* tutor.css: the ASL tutor's own screen.
+ *
+ * Scoped under .tutor- so it cannot reach anything else on the page; the
+ * platform's own variables (css/style.css) supply every color, so the tutor is
+ * the same warm, light page as the rest of the study.
+ *
+ * LAYOUT. On a wide screen the camera and the PANEL (the letter, what the tutor
+ * says, the reference picture) sit side by side, so the learner's eyes travel
+ * a hand's width between their own hand and the letter, not a screen's height;
+ * the FOOT (points, the letter map, the standing notes) runs underneath both.
+ * On a narrow screen everything stacks. All of it is CSS: `:has()` notices
+ * that the trial screen holds a tutor, and `display: contents` lets the
+ * tutor's two groups take part in the trial screen's grid.
+ *
+ * NOTHING HERE CARRIES INFORMATION BY COLOR ALONE. The mastery map's four
+ * states each print a word; the feedback tones differ in color AND in the text
+ * they hold. A learner who cannot tell the greens apart loses nothing. */
+
+/* `hidden` has to win. The browser hides [hidden] elements with a plain
+ * `display: none`, and ANY display rule on the element beats it -- the
+ * reference panel below is `display: flex`, so `reference.hidden = true` did
+ * nothing, and the last letter's picture stayed up beside the next letter's
+ * test (first working camera session, 2026-09-20: a B being asked for next to
+ * a drawing of an L). tests/tutor-css.test.js pins this rule. */
+.tutor [hidden] { display: none !important; }
+
+.tutor {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* ---- the wide layout ----------------------------------------------------- */
+
+@media (min-width: 900px) {
+  main:has(#screen-trial.visible .tutor) { max-width: 1120px; }
+
+  #screen-trial.visible:has(.tutor) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-areas:
+      "progress progress"
+      "stage    panel"
+      "foot     foot";
+    gap: 18px 28px;
+    align-items: start;
+  }
+  #screen-trial:has(.tutor) .progress { grid-area: progress; }
+  #screen-trial:has(.tutor) #trial-stage-slot { grid-area: stage; }
+  #screen-trial:has(.tutor) #trial-stage-slot #stage { margin: 0; }
+  #screen-trial:has(.tutor) #exp-mount,
+  #screen-trial:has(.tutor) .tutor { display: contents; }
+  #screen-trial:has(.tutor) .tutor-panel { grid-area: panel; }
+  #screen-trial:has(.tutor) .tutor-foot { grid-area: foot; }
+  #screen-trial:has(.tutor) .tutor-debug { grid-column: 1 / -1; }
+}
+
+/* The forty-second cap is a safety net, not a race. A countdown in the corner
+   of the picture made every letter feel timed. The cap still applies. */
+#screen-trial:has(.tutor) .timer { display: none; }
+
+/* ---- the panel: the letter, and what the tutor says ---------------------- */
+
+.tutor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tutor-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1.3rem 1.2rem 1.1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.tutor-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+.tutor-cue-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  width: 168px;
+  height: 168px;
+  border-radius: 50%;
+  transition: opacity 0.2s ease;
+}
+
+.tutor-ring {
+  width: 168px;
+  height: 168px;
+  /* The ring starts at twelve o'clock and fills clockwise, the way a timer
+     reads, rather than from wherever SVG happens to start an arc. */
+  transform: rotate(-90deg);
+}
+
+.tutor-ring-track,
+.tutor-ring-fill {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.tutor-ring-track { stroke: var(--soft); }
+
+.tutor-ring-fill {
+  stroke: var(--accent);
+  /* Short enough that the ring still reads as live, long enough that a jittery
+     progress value does not make it twitch. */
+  transition: stroke-dashoffset 80ms linear;
+}
+
+.tutor-cue {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+}
+
+/* The reward: one brief warm glow, no flashing, no movement. It fades out on
+   its own even if the class is left on, so a stuck timer cannot leave the page
+   pulsing at somebody. */
+.tutor-flash .tutor-cue { color: var(--good); }
+.tutor-flash .tutor-ring-track { stroke: var(--good-soft); }
+.tutor-flash { animation: tutor-glow 600ms ease-out 1; }
+
+@keyframes tutor-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(30, 158, 106, 0.45); }
+  100% { box-shadow: 0 0 0 20px rgba(30, 158, 106, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutor-flash { animation: none; }
+  .tutor-ring-fill { transition: none; }
+}
+
+/* ---- what the tutor says ------------------------------------------------ */
+
+.tutor-said {
+  width: 100%;
+  min-height: 3.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tutor-feedback {
+  margin: 0;
+  padding: 0.55rem 0.9rem;
+  border-radius: 12px;
+  font-size: 1.08rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+.tutor-feedback:empty { padding: 0; }
+
+/* A hint is a note from a tutor, so it looks like one. */
+.tutor-tone-correction { background: var(--tip); box-shadow: inset 0 0 0 1px var(--tip-line); color: #4d3d0c; }
+/* A camera complaint is not the learner's mistake, so it is the muted color,
+   not the red one. */
+.tutor-tone-sensor { background: var(--soft); color: var(--subtle); }
+.tutor-tone-neutral { color: var(--subtle); }
+.tutor-tone-done { background: var(--soft); color: var(--text); }
+.tutor-tone-reveal { background: var(--soft); color: var(--text); }
+.tutor-tone-correct { background: var(--good-soft); color: #11613f; font-weight: 800; }
+
+.tutor-status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--subtle);
+  min-height: 1.3rem;
+}
+
+/* ---- the reference picture ---------------------------------------------- */
+
+.tutor-reference {
+  margin: 0;
+  padding: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.tutor-picture {
+  width: 150px;
+  height: auto;
+  /* The drawings are dark ink on white; a quiet frame keeps the white plate
+     from floating on a white card. */
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px;
+}
+
+.tutor-caption {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--subtle);
+}
+
+.tutor-describe {
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tutor-mnemonic {
+  margin: 0;
+  text-align: center;
+  color: var(--subtle);
+  font-style: italic;
+}
+
+/* ---- the foot: points, the letter map, the standing notes ---------------- */
+
+.tutor-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.tutor-score {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.tutor-points {
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  background: var(--good-soft);
+  color: #11613f;
+  font-weight: 800;
+}
+
+/* Which hint policy is running is a fact for whoever is debugging, not for the
+   learner. It is still in the page (and in the log); ?debug=1 shows it. */
+.tutor-policy { display: none; font-size: 0.8rem; }
+#exp-mount:has(.tutor-debug) .tutor-policy { display: inline; }
+
+.tutor-map {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .tutor-map { grid-template-columns: repeat(9, 1fr); }
+}
+
+.tutor-cell {
+  padding: 6px 1px 5px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  text-align: center;
+  line-height: 1.15;
+  color: var(--subtle);
+}
+
+.tutor-cell-letter { display: block; font-size: 0.95rem; font-weight: 800; }
+.tutor-cell-state { display: block; font-size: 0.6rem; font-weight: 600; min-height: 0.7rem; }
+
+/* A letter this session does not teach: dim, and with no state word at all,
+   so "not taught here" never reads as "failed". */
+.tutor-cell-absent { opacity: 0.4; box-shadow: none; background: transparent; }
+
+.tutor-cell-introduced { color: var(--text); box-shadow: inset 0 0 0 2px var(--accent); background: var(--tip); }
+.tutor-cell-passed { color: #11613f; box-shadow: inset 0 0 0 2px var(--good); background: var(--good-soft); }
+.tutor-cell-retired { color: #fff; background: var(--good); box-shadow: none; }
+
+/* ---- the notes that stay on screen --------------------------------------- */
+
+.tutor-note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--subtle);
+}
+
+/* The ring while it is held shut (reading time, end-of-trial dwell). */
+.tutor-paused .tutor-ring { opacity: 0.35; }
+
+/* ?debug=1 only (experiments/asl-tutor/debug.js). Deliberately plain. */
+.tutor-debug { margin-top: 1rem; padding: 0.7rem 0.9rem; background: var(--panel); border: 1px dashed var(--line); border-radius: var(--radius); font-size: 0.8rem; }
+.tutor-debug-head { display: flex; gap: 0.8rem; align-items: center; margin-bottom: 0.4rem; }
+.tutor-debug button { font: inherit; font-weight: 700; padding: 0.25rem 0.7rem; border-radius: 8px; border: 1px solid var(--line); background: var(--soft); color: var(--text); cursor: pointer; }
+.tutor-debug pre { margin: 0; white-space: pre-wrap; font: 0.76rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); }
+
+/* tutor/letters.js pictureMirrored: shown as it looks on the learner's own mirrored screen. */
+.tutor-picture-flip { transform: scaleX(-1); }
+
+/* ---- the burst: a hold was taken ----------------------------------------- */
+/* A wave off the ring and twelve sparks flying out along their own angles.
+   Green for a right answer in teaching, the ring's orange on a test (where it
+   says only that the hold was taken). ui.js SPARKS / burst(). */
+.tutor-cue-wrap { --ring: 168px; }
+.tutor-burst { position: absolute; inset: 0; pointer-events: none; --burst: var(--accent); }
+.tutor-burst-good { --burst: var(--good); }
+.tutor-burst-wave {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 5px solid var(--burst); opacity: 0;
+}
+.tutor-burst i {
+  position: absolute; left: 50%; top: 50%;
+  width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%; background: var(--burst); opacity: 0;
+}
+.tutor-burst-go .tutor-burst-wave { animation: tutor-wave 650ms cubic-bezier(.15, .7, .3, 1) 1; }
+.tutor-burst-go i { animation: tutor-spark 720ms cubic-bezier(.12, .75, .3, 1) 1; }
+@keyframes tutor-wave {
+  0%   { opacity: .85; transform: scale(.92); }
+  100% { opacity: 0;   transform: scale(1.5); }
+}
+@keyframes tutor-spark {
+  0%   { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--ring) * -0.5)) scale(.6); }
+  15%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--ring) * -0.47 - var(--ring) * 0.36 * var(--d))) scale(.35); }
+}
+/* the letter gives a small pop, and takes the burst's color for a moment */
+.tutor-burst-good .tutor-cue, .tutor-burst-done .tutor-cue { animation: tutor-cue-pop 420ms cubic-bezier(.2, .9, .3, 1.4) 1; }
+.tutor-burst-done .tutor-cue { color: var(--accent-ink); }
+.tutor-burst-good .tutor-cue { color: var(--good); }
+@keyframes tutor-cue-pop { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
+
+/* the ring stays bright while it bursts, even though the trial is now paused */
+.tutor-burst-good .tutor-ring, .tutor-burst-done .tutor-ring { opacity: 1; }
+.tutor-burst-good .tutor-ring-fill { stroke: var(--good); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tutor-burst-go .tutor-burst-wave, .tutor-burst-go i,
+  .tutor-burst-good .tutor-cue, .tutor-burst-done .tutor-cue { animation: none; }
+}
+
+/* ---- the study's screen (JT, 2026-09-23) --------------------------------- */
+/* The camera is the whole left side. The right side is exactly as tall as the
+   camera and split in two equal halves: the letter and its ring on top, the
+   picture of the sign underneath (empty during a test). */
+.tutor-picture-slot { display: contents; }
+
+@media (min-width: 900px) {
+  main:has(#screen-trial.visible .tutor-layout-study) { max-width: 1200px; }
+  #screen-trial.visible:has(.tutor-layout-study) {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    grid-template-areas:
+      "progress progress"
+      "stage    panel";
+    align-items: stretch;
+    gap: 16px 22px;
+  }
+  /* contain: size keeps the panel from making the row taller than the camera:
+     it takes the camera's height and splits it, whatever is inside. */
+  #screen-trial:has(.tutor-layout-study) .tutor-panel {
+    contain: size;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .tutor-layout-study .tutor-main {
+    container-type: size;
+    min-height: 0;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.8rem 1rem;
+  }
+  .tutor-layout-study .tutor-label { font-size: 0.72rem; }
+  /* the ring is as big as the half allows, leaving room for one line of words */
+  .tutor-layout-study .tutor-cue-wrap {
+    --ring: clamp(84px, min(100cqh - 5.2rem, 70cqw), 230px);
+    width: var(--ring);
+    height: var(--ring);
+  }
+  .tutor-layout-study .tutor-ring { width: 100%; height: 100%; }
+  .tutor-layout-study .tutor-cue { font-size: calc(var(--ring) * 0.46); }
+  /* room for two lines, so the longest hint never pushes the ring out */
+  .tutor-layout-study .tutor-said { min-height: 0; height: 3rem; justify-content: center; }
+  .tutor-layout-study .tutor-feedback { font-size: 0.95rem; line-height: 1.25; padding: 0.3rem 0.8rem; }
+
+  .tutor-layout-study .tutor-picture-slot {
+    display: flex;
+    min-height: 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  /* no picture on a test: the half stays, quietly empty */
+  .tutor-layout-study .tutor-picture-slot:has(.tutor-reference[hidden]) {
+    background: var(--soft);
+    box-shadow: none;
+  }
+  /* the drawing at the full height of its half, the words beside it */
+  .tutor-layout-study .tutor-reference {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    padding: 0.9rem 1.1rem;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+    grid-template-rows: 1fr auto auto auto 1fr;
+    grid-template-areas: "pic ." "pic describe" "pic mnemonic" "pic caption" "pic .";
+    column-gap: 1.1rem;
+    row-gap: 0.35rem;
+    align-items: center;
+    text-align: left;
+  }
+  .tutor-layout-study .tutor-picture {
+    grid-area: pic;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    object-fit: contain;
+    padding: 10px;
+  }
+  .tutor-layout-study .tutor-picture-slot { container-type: size; }
+  .tutor-layout-study .tutor-describe { grid-area: describe; text-align: left; }
+  .tutor-layout-study .tutor-mnemonic { grid-area: mnemonic; text-align: left; }
+  .tutor-layout-study .tutor-caption { grid-area: caption; }
+  /* the words shrink with the half they are in, and on a small screen the
+     least needed go first: the caption, then the mnemonic */
+  .tutor-layout-study .tutor-describe { font-size: clamp(0.8rem, 7cqh, 1rem); line-height: 1.3; }
+  .tutor-layout-study .tutor-mnemonic { font-size: clamp(0.78rem, 6.5cqh, 0.95rem); line-height: 1.3; }
+  @container (max-height: 225px) { .tutor-layout-study .tutor-caption { display: none; } }
+  @container (max-height: 205px) { .tutor-layout-study .tutor-mnemonic { display: none; } }
+}
+
+/* one line of words under the ring: what the tutor said, or failing that the
+   standing instruction */
+.tutor-layout-study .tutor-feedback:not(:empty) + .tutor-status { display: none; }
+
+/* ---- the demo films on the instruction and break screens ----------------- */
+.study-demo { margin: 1rem 0; position: relative; }
+.study-demo-sound {
+  position: absolute; right: 10px; top: 10px;
+  font: inherit; font-size: .78rem; font-weight: 700;
+  padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .88); color: var(--text); cursor: pointer;
+}
+.study-demo video {
+  display: block;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  aspect-ratio: 16 / 9;
+}
+
+/* ---- the ghost-hand demo (experiments/asl-demo.js) ------------------------- */
+.tutor-layout-study .tutor-status[data-state] { font-weight: 700; font-size: 1.02rem; color: #0c4a6e; transition: color .15s ease; }
+.tutor-layout-study .tutor-status[data-state="tutor"] { font-weight: 400; font-size: inherit; color: var(--muted, #555); }
+.tutor-layout-study .tutor-status[data-state="fix"] { color: #b45309; }
+.tutor-layout-study .tutor-status[data-state="match"], .tutor-layout-study .tutor-status[data-state="accepted"] { color: #15803d; }
+.demo-legend {
+  display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; justify-content: center;
+  margin-top: 0.6rem; font-size: 0.8rem; color: var(--muted, #555);
+}
+.demo-legend > span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.demo-keys kbd, .demo-legend-list + p kbd {
+  font: inherit; font-size: 0.75rem; padding: 0 0.35rem; border: 1px solid var(--line, #ccc);
+  border-radius: 4px; background: #fff;
+}
+.demo-chip { display: inline-block; width: 0.95em; height: 0.95em; border-radius: 50%; border: 2px solid; vertical-align: -0.1em; }
+.demo-chip-neutral { background: #fff; border-color: #0f172a; }
+.demo-chip-fix { background: hsl(38 96% 66%); border-color: hsl(28 92% 40%); }
+.demo-chip-match { background: #22c55e; border-color: #14532d; }
+.demo-legend-list { list-style: none; padding: 0; }
+.demo-legend-list li { margin: 0.4rem 0; display: flex; gap: 0.5rem; align-items: center; }
+html.asl-demo #done-demo { display: none !important; }
+.demo-again { display: inline-block; padding: 0.55rem 1.2rem; border-radius: 10px; background: #1f2937; color: #fff; font-weight: 700; text-decoration: none; }
+.demo-chip-you { background: rgba(56, 189, 248, 0.95); border-color: #0369a1; }
+.demo-flip { font-size: 0.9rem; color: var(--text, #222); margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: #fff7e6; border: 1px solid #f5d9a6; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; text-align: center; }
+.demo-flip[hidden] { display: none; }
+.demo-flip-btn { font: inherit; font-size: 1rem; font-weight: 700; padding: 10px 18px; border-radius: 12px; cursor: pointer;
+  background: var(--panel, #fff); color: var(--text, #222); border: 2px solid var(--line, #ddd); border-bottom-width: 4px; }
+.demo-flip-btn:hover { filter: brightness(0.97); }
+.demo-flip-btn:focus-visible { outline: 3px solid var(--accent, #f59e0b); outline-offset: 2px; }
+
+/* ---- the demo, 2 (19 Oct): the room dimmed round the hand, a meter per finger, the tutor's notes ---------------- */
+/* focus.js: the dimmer canvas sits between the camera picture and the outline (inside the mirrored box, so the
+   general "#stage canvas" rule sizes and crops it exactly like them); it fades in once a hand is seen */
+.focus-dim { pointer-events: none; transition: opacity .35s ease; }
+.focus-dim.focus-off { opacity: 0; }
+
+/* the words after a hold now name the letter the hand looks like as well as the fix: room for three lines */
+@media (min-width: 900px) {
+  html.asl-demo .tutor-layout-study .tutor-said { height: 4.5rem; }
+  html.asl-demo .tutor-layout-study .tutor-cue-wrap { --ring: clamp(84px, min(100cqh - 6.6rem, 70cqw), 220px); }
+}
+
+/* meters.js: a column per finger (thumb to pinky), then the gaps and the hand's direction; the band at the top is
+   where every part has to be; amber is "change this", never red */
+.demo-meters {
+  position: absolute; bottom: 12px; z-index: 3;
+  display: flex; align-items: flex-end; gap: 5px;
+  padding: 9px 10px 6px; border-radius: 12px;
+  background: rgba(15, 23, 42, 0.66); color: #fff; pointer-events: none;
+}
+.demo-meters-left { left: 12px; }
+.demo-meters-right { right: 12px; }
+.demo-meters[hidden] { display: none; }
+.demo-meters .meter { display: flex; flex-direction: column; align-items: center; width: 34px; }
+.demo-meters .meter-gap-before { margin-left: 10px; }
+.demo-meters .meter-track { position: relative; width: 14px; height: 104px; border-radius: 7px; background: rgba(255, 255, 255, 0.13); overflow: hidden; }
+.demo-meters .meter-band { position: absolute; top: 0; left: 0; right: 0; height: 18%; background: rgba(34, 197, 94, 0.22); border-bottom: 1px dashed rgba(255, 255, 255, 0.55); }
+.demo-meters .meter-fill { position: absolute; inset: 0; transform-origin: 50% 100%; transform: scaleY(0); background: #94a3b8; transition: background-color .2s ease; }
+.demo-meters .meter[data-tone="good"] .meter-fill { background: #22c55e; }
+.demo-meters .meter[data-tone="fix"] .meter-fill { background: #f59e0b; }
+.demo-meters .meter[data-tone="off"] .meter-fill { background: #cbd5e1; }
+.demo-meters .meter[data-tone="idle"] .meter-fill { background: rgba(203, 213, 225, 0.35); }
+.demo-meters .meter-label { margin-top: 4px; font-size: 0.64rem; font-weight: 600; letter-spacing: 0.01em; }
+.demo-meters .meter-dir { min-height: 0.85rem; font-size: 0.6rem; font-weight: 800; color: #fcd34d; }
+
+/* notes-view.js: what the tutor read on the last hold (T) */
+.demo-notes {
+  margin-top: 0.8rem; padding: 0.65rem 0.85rem; text-align: left;
+  background: var(--panel, #fff); border: 1px solid var(--line, #ddd); border-radius: 14px; font-size: 0.8rem;
+}
+.demo-notes[hidden] { display: none; }
+.demo-notes h3 { margin: 0 0 0.35rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted, #555); }
+.demo-notes h3 kbd { font: inherit; font-size: 0.68rem; padding: 0 0.3rem; border: 1px solid var(--line, #ccc); border-radius: 4px; background: #fff; }
+.demo-notes .notes-head { margin: 0 0 0.35rem; font-size: 0.86rem; }
+.demo-notes .notes-table { width: 100%; border-collapse: collapse; margin-bottom: 0.35rem; }
+.demo-notes .notes-table th { text-align: left; font-weight: 600; padding: 1px 6px 1px 0; white-space: nowrap; }
+.demo-notes .notes-table td { padding: 1px 4px; vertical-align: top; }
+.demo-notes .notes-line { margin: 0.15rem 0; }
+.demo-notes .notes-line > span { display: inline-block; min-width: 6.2rem; font-weight: 600; }
+.demo-notes .notes-small { color: var(--muted, #555); font-size: 0.74rem; }
+.demo-notes .notes-ok { color: #15803d; font-weight: 700; }
+.demo-notes .notes-off { color: #b45309; font-weight: 700; }
+.demo-notes .notes-na { color: #94a3b8; }
+.demo-notes .notes-empty { margin: 0; color: var(--muted, #555); }
+.demo-notes .notes-json pre { max-height: 220px; overflow: auto; font-size: 0.68rem; background: #f8fafc; padding: 0.5rem; border-radius: 8px; margin: 0.3rem 0 0; }
+/* the legend and the notes sit under the panel, in its column (asl-demo.js .demo-side) */
+@media (min-width: 900px) {
+  #screen-trial:has(.tutor-layout-study) .demo-side { grid-column: 2; }
+}
+.demo-side .demo-legend { margin-top: 0; }
+@media (min-width: 900px) {
+  #screen-trial:has(.tutor-layout-study) .demo-notes-slot { grid-column: 1; grid-row: 3; }
+  #screen-trial:has(.tutor-layout-study) .demo-side { grid-row: 3; }
+}
+.demo-notes-slot .demo-notes { margin-top: 0; }
+.demo-meters .meter[data-tone="fix"] .meter-track { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.9); }
+.demo-meters .meter[data-tone="fix"] .meter-label { color: #fcd34d; }
+/* the demo's end screen: each letter, how it went, and what it looked like instead on the way */
+.demo-results td, .demo-results th { text-align: left; }
+.demo-results tr.demo-made td:nth-child(2) { color: #15803d; font-weight: 600; }
+.demo-results tr.demo-notyet td:nth-child(2) { color: #b45309; }
+/* the key row wraps between keys, never inside one (it could not narrow before, and ran off small screens) */
+.demo-legend > .demo-keys { display: block; flex-basis: 100%; text-align: center; line-height: 1.9; }
+.demo-key { white-space: nowrap; margin: 0 0.35rem; }
+/* the meter panel scales with the camera view, and stands aside on J and Z (no finger levels) or a small view */
+html.asl-demo #stage { container-type: inline-size; }
+@container (max-width: 640px) { .demo-meters { transform: scale(0.72); transform-origin: left bottom; } .demo-meters-right { transform-origin: right bottom; } }
+@container (max-width: 440px) { .demo-meters { display: none; } }
+.demo-meters.demo-meters-aside { display: none; }

@@ -1,0 +1,15 @@
+{
+  "name": "Fingerspelling practice",
+  "short_name": "Fingerspell",
+  "description": "Practice fingerspelling with your phone's camera: it checks your handshape and shows you what to change.",
+  "start_url": "../",
+  "scope": "../",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf7f2",
+  "theme_color": "#faf7f2",
+  "icons": [
+    { "src": "share/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "share/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

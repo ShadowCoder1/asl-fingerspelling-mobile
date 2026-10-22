@@ -1,0 +1,343 @@
+/* style.css, deliberately plain. Change the colors at the top and the whole
+ * study restyles. Nothing here affects your data.
+ *
+ * THE LOOK: warm paper, dark ink, one marigold accent, a rounded typeface and
+ * chunky buttons. Light on purpose -- a webcam picture of a person in a room is
+ * mostly light, and a dark page around it made the whole thing read as a
+ * developer tool rather than something friendly to learn with. */
+
+@font-face {
+  font-family: "Nunito";
+  src: url("../assets/fonts/nunito-latin.woff2") format("woff2");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #faf7f2;        /* warm paper */
+  --panel: #ffffff;
+  --line: #e9e3d8;      /* hairlines and quiet borders */
+  --soft: #f2ede4;      /* a tint of the paper, for tracks and wells */
+  --text: #23201b;      /* ink */
+  --subtle: #6f6a61;
+  --accent: #f5a524;    /* marigold: the ring, the progress bar */
+  --accent-ink: #8a5a00;
+  --link: #2456c9;
+  --good: #1e9e6a;
+  --good-soft: #e3f5ec;
+  --bad: #d6455d;
+  --tip: #fff5d9;       /* the hint card */
+  --tip-line: #f3e0a8;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(35, 32, 27, .05), 0 8px 24px rgba(35, 32, 27, .06);
+  --maxw: 720px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.6 "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.01em; margin: 0 0 4px; }
+h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -.01em; margin: 28px 0 12px; }
+a { color: var(--link); }
+code { background: var(--soft); padding: 2px 6px; border-radius: 6px; font-size: .88em; }
+.subtle { color: var(--subtle); font-size: .92rem; }
+.good { color: var(--good); }
+.bad  { color: var(--bad); }
+
+/* ---- screens: exactly one is visible at a time ------------------------- */
+.screen { display: none; }
+.screen.visible { display: block; animation: fade .18s ease-out; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+.prose { background: var(--panel); padding: 18px 22px; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.prose p:first-child { margin-top: 0; }
+.prose p:last-child  { margin-bottom: 0; }
+
+/* ---- controls ---------------------------------------------------------- */
+button.primary {
+  display: block;
+  width: 100%;
+  margin-top: 24px;
+  padding: 15px 20px;
+  font: inherit;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--text);
+  border: 0;
+  /* The darker lower edge is what makes it look like something to press. */
+  border-bottom: 4px solid #000;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: transform .06s ease, filter .12s ease;
+}
+button.primary:hover:not(:disabled) { filter: brightness(1.25); }
+button.primary:active:not(:disabled) { transform: translateY(2px); border-bottom-width: 2px; margin-bottom: 2px; }
+button.primary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+button.primary:disabled { background: var(--soft); border-bottom-color: var(--line); color: #a39d92; cursor: not-allowed; }
+
+.field { margin-top: 20px; }
+.field label { display: block; font-size: .9rem; color: var(--subtle); margin-bottom: 6px; }
+.field input {
+  width: 100%; padding: 12px 14px; font-size: 1rem;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+
+/* ---- the camera view --------------------------------------------------- */
+#stage {
+  position: relative;
+  width: 100%;
+  max-width: var(--maxw);
+  aspect-ratio: 4 / 3;
+  margin: 16px 0;
+  background: #1b1916;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* Flipped so the participant sees a mirror image, which is what people
+   expect from a webcam. Text is kept outside this element on purpose. */
+#stage .mirror { position: absolute; inset: 0; transform: scaleX(-1); }
+#stage video, #stage canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+
+.readout, .timer, .countdown { color: #fff; }
+.readout .unit { color: rgba(255,255,255,.75); }
+.readout {
+  position: absolute; top: 14px; left: 18px;
+  display: flex; align-items: baseline; gap: 8px;
+  text-shadow: 0 2px 10px rgba(0,0,0,.85);
+  pointer-events: none;
+}
+.readout .big  { font-size: 3.4rem; font-weight: 700; line-height: 1; }
+.readout .unit { font-size: 1rem; }
+
+.timer {
+  position: absolute; top: 14px; right: 18px;
+  font-size: 1.4rem; font-weight: 600;
+  text-shadow: 0 2px 10px rgba(0,0,0,.85);
+  pointer-events: none;
+}
+
+.countdown {
+  position: absolute; inset: 0;
+  display: none; align-items: center; justify-content: center;
+  font-size: 7rem; font-weight: 800;
+  background: rgba(0,0,0,.45);
+  pointer-events: none;
+}
+.countdown.visible { display: flex; }
+.countdown.pulse { animation: pop .5s ease-out; }
+@keyframes pop { from { transform: scale(1.6); opacity: .2; } to { transform: scale(1); opacity: 1; } }
+
+/* ---- progress ---------------------------------------------------------- */
+.progress { font-size: .9rem; color: var(--subtle); }
+.progress-bar { height: 8px; background: var(--soft); border-radius: 4px; margin-top: 6px; overflow: hidden; }
+#progress-bar-fill { height: 100%; width: 0; background: var(--accent); border-radius: 4px; transition: width .3s; }
+.prompt { font-size: 1.15rem; margin: 14px 0 0; }
+.prompt:empty { display: none; }
+
+/* ---- status lines ------------------------------------------------------ */
+.status { font-weight: 600; }
+.status.good { color: var(--good); }
+.status.bad  { color: var(--bad); }
+
+.help { margin-top: 20px; color: var(--subtle); }
+.help summary { cursor: pointer; }
+
+/* ---- spinner ----------------------------------------------------------- */
+.spinner {
+  width: 34px; height: 34px; margin: 40px auto 20px;
+  border: 3px solid var(--line); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- check.html -------------------------------------------------------- */
+.check {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--panel); padding: 14px 16px;
+  border-radius: var(--radius); margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+}
+.check.pass { border-left-color: var(--good); }
+.check.fail { border-left-color: var(--bad); }
+.check.busy { border-left-color: var(--accent); }
+.check .icon { font-size: 1.2rem; line-height: 1.5; width: 1.4em; flex: none; }
+.check .body { flex: 1; min-width: 0; }
+.check .name { font-weight: 600; }
+.check .detail { color: var(--subtle); font-size: .9rem; margin-top: 4px; white-space: pre-wrap; }
+.check .detail a { color: var(--link); }
+
+/* ---- demo-mode banner -------------------------------------------------- */
+.banner {
+  max-width: var(--maxw);
+  margin: 14px auto 0;
+  padding: 10px 16px;
+  background: var(--tip);
+  border: 1px solid var(--tip-line);
+  border-radius: var(--radius);
+  color: #5c4a12;
+  font-size: .88rem;
+  line-height: 1.5;
+}
+main .banner { max-width: none; margin: 0 0 14px; }
+.banner a { color: inherit; }
+.banner code { background: rgba(255,255,255,.6); }
+
+/* ---- results table on the final screen --------------------------------- */
+table.results {
+  width: 100%;
+  margin: 18px 0 8px;
+  border-collapse: collapse;
+  background: var(--panel);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line);
+}
+table.results th, table.results td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+table.results tr:first-child th {
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--subtle);
+  font-weight: 600;
+}
+table.results tr:last-child th, table.results tr:last-child td { border-bottom: 0; }
+table.results td { font-variant-numeric: tabular-nums; }
+
+.banner.subtle-banner {
+  background: var(--soft);
+  border-color: var(--line);
+  color: var(--subtle);
+}
+
+/* ---- consent form ------------------------------------------------------ */
+#consent-doc-wrap {
+  margin: 18px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fff;
+}
+#consent-doc {
+  display: block;
+  width: 100%;
+  height: 62vh;
+  min-height: 380px;
+  border: 0;
+}
+
+.q-choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  cursor: pointer;
+  line-height: 1.5;
+}
+.q-choice input { margin-top: .35em; flex: none; width: 18px; height: 18px; accent-color: var(--text); }
+
+.affirm {
+  padding: 12px 14px;
+  margin-top: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* ---- generated questions ----------------------------------------------- */
+.q { margin-top: 22px; }
+.q > label { display: block; font-weight: 600; margin-bottom: 6px; }
+.q .req { color: var(--bad); }
+.q-help { margin: 0 0 8px; color: var(--subtle); font-size: .88rem; }
+
+.q input[type="text"],
+.q input[type="number"],
+.q select,
+.q textarea {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.q select { appearance: none; cursor: pointer; }
+.q textarea { resize: vertical; }
+.q input:focus, .q select:focus, .q textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.q-group { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 14px; }
+
+.q-error { margin: 6px 0 0; color: var(--bad); font-size: .88rem; }
+.bad-field input, .bad-field select, .bad-field textarea, .bad-field .q-group {
+  border-color: var(--bad);
+}
+
+/* ---- preview.html ------------------------------------------------------ */
+pre.prose { white-space: pre-wrap; word-break: break-word; font-size: .88rem; margin: 12px 0; }
+.banner ul { margin: 8px 0 0; padding-left: 20px; }
+
+/* ---- the ASL check before the expert test (experiments/sign-quiz.js) ---- */
+.sign-quiz-progress { margin: 0 0 -8px; }
+.sign-quiz-video { display: flex; justify-content: center; margin: 8px 0 18px; }
+.sign-quiz-video video { height: min(46vh, 380px); max-width: 100%; border-radius: var(--radius); background: #000; box-shadow: var(--shadow); }
+.sign-quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sign-quiz-option {
+  font: inherit; font-weight: 700; font-size: 1.05rem; color: var(--text); cursor: pointer;
+  padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-bottom-width: 4px;
+  border-radius: var(--radius);
+}
+.sign-quiz-option:hover:not(:disabled) { border-color: var(--accent); }
+.sign-quiz-option:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sign-quiz-option:disabled { opacity: .6; cursor: default; }
+.sign-quiz-credit { margin-top: 18px; font-size: .78rem; }
+#sign-quiz-start { margin-top: 18px; }
+
+/* a slider question (form.js type "range"): a plain track and a round thumb, the same in every browser; grey until
+ * moved, so the starting position does not read as an answer */
+.q-range { display: flex; align-items: center; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.q-range input[type="range"] { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: var(--soft); border: 1px solid var(--line); cursor: pointer; }
+.q-range input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-ink); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(35, 32, 27, .35); }
+.q-range input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-ink); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(35, 32, 27, .35); }
+.q-range input[type="range"][data-touched="0"]::-webkit-slider-thumb { background: #c9c2b6; }
+.q-range input[type="range"][data-touched="0"]::-moz-range-thumb { background: #c9c2b6; }
+.q-range input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.q-range output { min-width: 8.5em; text-align: right; font-weight: 700; }
+.q-range:has(input[data-touched="0"]) output { color: var(--subtle); font-weight: 600; }
+
+/* a section title inside a form (form.js type "heading") */
+.q-heading { font-size: 1.15rem; font-weight: 800; margin: 34px 0 4px; }
+
+/* ?srcmirror=1 (js/core/tracker.js): the camera already sends a mirror image, so show it as it comes and flip only the
+ * drawing on top (made from the corrected landmarks). */
+html.src-mirror #stage .mirror { transform: none; }
+html.src-mirror #overlay { transform: scaleX(-1); }

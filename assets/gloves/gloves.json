@@ -1,0 +1,38 @@
+{
+ "about": "Indranil's glove renders (Blender, 20 Oct 2026: x_hand; L re-rendered upright, wrist at the bottom; and G re-rendered twice the same day, the last with the index pointing and the thumb along it; JT chose L X G for Thursday's demo, right hand only) cut out of their black backgrounds by tools/ghost-hands/gloves/cut.py and saved 720 px on the long side. Each is a RIGHT hand as it looks on the learner's own (mirrored) screen. W is the wrist and M the middle finger's knuckle, as fractions of the image (x from the left, y from the top). They size and place the glove (experiments/asl-tutor/glove.js). L, G and X: where the site's hand model (MediaPipe hand_landmarker float16/1) found them on the renders recoloured to skin (tools/ghost-hands/gloves/detect.py), median of its readings, the wrist moved to where the hand meets the cuff.",
+ "letters": {
+  "L": {
+   "src": "assets/gloves/L.png",
+   "W": [
+    0.71,
+    0.8
+   ],
+   "M": [
+    0.63,
+    0.49
+   ]
+  },
+  "X": {
+   "src": "assets/gloves/X.png",
+   "W": [
+    0.62,
+    0.68
+   ],
+   "M": [
+    0.63,
+    0.31
+   ]
+  },
+  "G": {
+   "src": "assets/gloves/G.png",
+   "W": [
+    0.82,
+    0.57
+   ],
+   "M": [
+    0.44,
+    0.5
+   ]
+  }
+ }
+}

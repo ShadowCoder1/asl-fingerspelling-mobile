@@ -1,0 +1,332 @@
+/* mobile/app.css: the phone version's own look. The study's colours and typeface (css/style.css), laid out for a
+ * phone held upright: the camera view as large as the screen allows at its own shape (never cropped, so what the
+ * tracker sees is what the learner sees), the letter and its picture ON the camera view, what the tutor says under
+ * it, one button. Landscape and desktop put the words beside the camera instead.
+ * css/tutor.css is loaded first; its ring, burst and tones are kept and only its layout is overridden here. */
+
+@font-face {
+  font-family: "Nunito";
+  src: url("../assets/fonts/nunito-latin.woff2") format("woff2");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #faf7f2;
+  --panel: #ffffff;
+  --line: #e9e3d8;
+  --soft: #f2ede4;
+  --text: #23201b;
+  --subtle: #6f6a61;
+  --muted: #6f6a61;
+  --accent: #f5a524;
+  --accent-ink: #8a5a00;
+  --good: #1e9e6a;
+  --good-deep: #157a51;
+  --good-soft: #e3f5ec;
+  --bad: #d6455d;
+  --tip: #fff5d9;
+  --tip-line: #f3e0a8;
+  --shadow: 0 1px 2px rgba(35, 32, 27, .05), 0 8px 24px rgba(35, 32, 27, .07);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.5 "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+body { overscroll-behavior: none; }
+button { font: inherit; color: inherit; touch-action: manipulation; }
+h1 { font-size: clamp(1.6rem, 7vw, 2.1rem); line-height: 1.15; font-weight: 800; letter-spacing: -0.015em; margin: 0; }
+
+/* ---- screens ----------------------------------------------------------------------------------------------------- */
+.screen { display: none; }
+body[data-screen="welcome"] #welcome,
+body[data-screen="results"] #results,
+body[data-screen="error"] #error { display: flex; }
+body[data-screen="practice"] #practice { display: flex; }
+
+.screen-welcome, .screen-results, .screen-error {
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  padding: calc(var(--safe-t) + 18px) calc(var(--safe-r) + 22px) calc(var(--safe-b) + 18px) calc(var(--safe-l) + 22px);
+  max-width: 560px;
+  margin: 0 auto;
+}
+.welcome-inner, .results-inner, .error-inner { flex: 1 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.welcome-cta, .results-cta, .error-cta { flex: none; display: flex; flex-direction: column; gap: 12px; padding-top: 18px; }
+
+/* ---- buttons ----------------------------------------------------------------------------------------------------- */
+.btn {
+  display: block; width: 100%; min-height: 54px; padding: 12px 18px;
+  border: 0; border-radius: 16px; cursor: pointer;
+  font-size: 1.08rem; font-weight: 800; letter-spacing: 0.02em;
+  transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
+  user-select: none; -webkit-user-select: none;
+}
+.btn-primary { background: var(--good); color: #fff; box-shadow: 0 4px 0 var(--good-deep); }
+.btn-primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--good-deep); }
+.btn-primary:disabled { background: #9fcdb8; box-shadow: 0 4px 0 #86b8a2; cursor: default; transform: none; }
+.btn-secondary { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 2px var(--line), 0 4px 0 var(--line); }
+.btn-secondary:active { transform: translateY(3px); box-shadow: inset 0 0 0 2px var(--line), 0 1px 0 var(--line); }
+.btn-ghost { background: transparent; color: var(--subtle); min-height: 44px; font-weight: 700; box-shadow: none; }
+.btn-ghost:active { background: var(--soft); }
+.btn-danger { color: var(--bad); }
+.btn:focus-visible, .icon-btn:focus-visible, .link-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.link-btn { background: none; border: 0; padding: 0; color: #2456c9; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.icon-btn {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center;
+  background: transparent; border: 0; border-radius: 12px; cursor: pointer; color: #9a9389;
+}
+.icon-btn:active { background: var(--soft); }
+.icon-btn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+#btn-sound .ico-sound-off { display: none; }
+#btn-sound[aria-pressed="false"] .ico-sound-on { display: none; }
+#btn-sound[aria-pressed="false"] .ico-sound-off { display: block; }
+
+/* ---- welcome ----------------------------------------------------------------------------------------------------- */
+.pill {
+  align-self: flex-start; margin: 0; padding: 4px 12px; border-radius: 999px;
+  background: var(--soft); color: var(--subtle); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.03em;
+}
+.hero { display: flex; justify-content: center; align-items: flex-end; gap: 10px; min-height: 150px; margin: 6px 0 4px; }
+.hero-tile {
+  position: relative; width: min(29%, 118px); aspect-ratio: 1 / 1.08; border-radius: 22px;
+  background: var(--panel); box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 8px 6px;
+  animation: float 3.2s ease-in-out infinite;
+}
+.hero-tile:nth-child(1) { transform: rotate(-5deg); animation-delay: -0.6s; }
+.hero-tile:nth-child(2) { transform: translateY(-10px); animation-delay: -1.4s; }
+.hero-tile:nth-child(3) { transform: rotate(5deg); animation-delay: -2.2s; }
+.hero-tile img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.hero-tile b { font-size: 1.05rem; font-weight: 800; line-height: 1.2; }
+.hero-tile.hero-glove { background: radial-gradient(circle at 50% 38%, #f5f0ff 0%, #ffffff 70%); }
+@keyframes float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+.lede { margin: 0; font-size: 1.05rem; color: #4a453d; }
+.steps { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.steps li { display: flex; gap: 12px; align-items: center; padding: 10px 12px; background: var(--panel); border-radius: 16px; box-shadow: inset 0 0 0 1px var(--line); font-size: 0.98rem; line-height: 1.35; }
+.step-icon { flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--tip); color: var(--accent-ink); }
+.step-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.step-icon-good { background: var(--good-soft); color: var(--good); }
+.inapp { margin: 0; padding: 10px 12px; border-radius: 14px; background: var(--tip); box-shadow: inset 0 0 0 1px var(--tip-line); font-size: 0.92rem; }
+.loadline { display: flex; align-items: center; gap: 10px; min-height: 22px; font-size: 0.85rem; color: var(--subtle); justify-content: center; }
+.loadline.loadline-done { visibility: hidden; }
+.loadbar { flex: 0 0 72px; height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+.loadbar-fill { height: 100%; width: 0%; background: var(--good); border-radius: 3px; transition: width .25s ease; }
+.fineprint { margin: 0; text-align: center; font-size: 0.8rem; line-height: 1.4; color: var(--subtle); }
+
+/* ---- practice ---------------------------------------------------------------------------------------------------- */
+.screen-practice {
+  position: fixed; inset: 0;
+  flex-direction: column;
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  overflow: hidden;
+  user-select: none; -webkit-user-select: none;
+}
+.topbar { flex: none; display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px; }
+.progress { flex: 1; height: 16px; border-radius: 999px; background: #ece6da; overflow: hidden; }
+.progress-fill {
+  height: 100%; width: 0%; border-radius: 999px; min-width: 16px;
+  background: linear-gradient(var(--good), var(--good)) padding-box;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), inset 0 4px 0 rgba(255, 255, 255, 0.28);
+  transition: width .6s cubic-bezier(.3, 1.4, .5, 1), opacity .2s ease;
+}
+.progress-fill.progress-zero { opacity: 0; }
+
+.practice-main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 0 12px 10px; }
+/* flex-basis 0: the view's box is the room left over, never the size of the view already in it (app.js layout) */
+.stage-wrap { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; align-items: flex-start; justify-content: center; }
+/* upright, the words get what the camera view leaves (app.js layout: at least 172 px, so the view never changes size
+   when a hint grows a line); past 300 px the two are centred together instead */
+.panel { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; min-height: 0; max-height: 300px; }
+.practice-main { justify-content: center; }
+.setup-card, #exp-mount { flex: 1 1 auto; min-height: 0; }
+#exp-mount .tutor, #exp-mount .tutor-panel, #exp-mount .tutor-main { height: 100%; }
+#exp-mount .tutor-main, .setup-card { overflow-y: auto; scrollbar-width: none; }
+
+#stage {
+  position: relative; flex: none;
+  width: 100%; aspect-ratio: 3 / 4;   /* app.js sets the exact size from the camera's own shape */
+  background: #1b1916; border-radius: 22px; overflow: hidden;
+  box-shadow: 0 2px 4px rgba(35, 32, 27, .08), 0 10px 30px rgba(35, 32, 27, .12);
+  container-type: inline-size;
+}
+#stage .mirror { position: absolute; inset: 0; transform: scaleX(-1); }
+#stage video, #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+#stage video { background: #1b1916; }
+/* ?srcmirror=1 (js/core/tracker.js): the camera already sends a mirror image, so show it as it comes and flip only
+   the drawing on top of it (css/style.css has the same two rules) */
+html.src-mirror #stage .mirror { transform: none; }
+html.src-mirror #overlay { transform: scaleX(-1); }
+
+.stage-message {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  background: rgba(27, 25, 22, 0.55); color: #fff; text-align: center; padding: 24px; font-weight: 700;
+}
+.stage-message p { margin: 0; max-width: 260px; }
+.spinner { width: 34px; height: 34px; border-radius: 50%; border: 4px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.perf { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.55); color: #fff; font: 600 11px/1.4 ui-monospace, Menlo, monospace; white-space: nowrap; pointer-events: none; }
+
+/* the letter with its hold ring, and the letter's picture, on the camera view (moved here by app.js) */
+.hud { position: absolute; inset: 0; pointer-events: none; }
+body:not(.phase-practice) .hud { visibility: hidden; }
+.hud .tutor-cue-wrap {
+  position: absolute; top: 10px; left: 10px;
+  --ring: clamp(66px, 21cqw, 92px);
+  width: var(--ring); height: var(--ring);
+  background: rgba(255, 255, 255, 0.95); border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+.hud .tutor-ring { width: 100%; height: 100%; }
+.hud .tutor-ring-track, .hud .tutor-ring-fill { stroke-width: 10; }
+.hud .tutor-cue { font-size: calc(var(--ring) * 0.54); color: var(--text); }
+.hud .tutor-cue.cue-in { animation: cue-in 420ms cubic-bezier(.2, .9, .3, 1.3) 1; }
+@keyframes cue-in { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.hud .tutor-paused .tutor-ring { opacity: 0.4; }
+.hud .tutor-reference {
+  position: absolute; top: 10px; right: 10px; margin: 0;
+  width: clamp(70px, 23cqw, 112px); padding: 6px;
+  background: rgba(255, 255, 255, 0.95); border: 0; border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+}
+.hud .tutor-picture { display: block; width: 100%; height: auto; padding: 0; border: 0; border-radius: 10px; background: #fff; }
+.hud .tutor-caption, .hud .tutor-describe, .hud .tutor-mnemonic { display: none !important; }
+
+/* what the tutor says: one card under the camera */
+#exp-mount { display: block; }
+body:not(.phase-practice) #exp-mount, body:not(.phase-practice) .practice-actions { display: none !important; }
+#exp-mount .tutor { gap: 0; }
+#exp-mount .tutor-label, #exp-mount .tutor-foot, #exp-mount .demo-side, #exp-mount .demo-notes-slot, #exp-mount .tutor-picture-slot,
+#exp-mount .tutor-debug { display: none !important; }
+#exp-mount .tutor-panel { gap: 0; }
+#exp-mount .tutor-main, .setup-card {
+  gap: 4px; padding: 12px 16px; min-height: 104px; justify-content: center;
+  background: var(--panel); border: 0; border-radius: 20px; box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
+  text-align: center;
+}
+#exp-mount .tutor-said { min-height: 0; gap: 4px; }
+#exp-mount .tutor-feedback { font-size: 1.02rem; line-height: 1.3; padding: 0.45rem 0.75rem; }
+#exp-mount .tutor-feedback:empty { display: none; }
+#exp-mount .tutor-status { margin: 0; font-size: 1.12rem; line-height: 1.3; font-weight: 800; color: #0c4a6e; min-height: 0; }
+#exp-mount .tutor-status:empty { display: none; }
+#exp-mount .tutor-status[data-state="tutor"] { font-weight: 600; font-size: 1.02rem; color: var(--subtle); }
+#exp-mount .tutor-status[data-state="fix"] { color: #b45309; }
+#exp-mount .tutor-status[data-state="match"], #exp-mount .tutor-status[data-state="accepted"] { color: #15803d; }
+.practice-actions { display: flex; justify-content: center; }
+.practice-actions .btn { width: auto; padding: 8px 18px; min-height: 40px; font-size: 0.95rem; }
+
+.setup-card { display: flex; flex-direction: column; align-items: center; }
+body:not(.phase-setup) .setup-card { display: none; }
+.setup-title { margin: 0; font-size: 1.2rem; font-weight: 800; }
+.setup-status { margin: 0; color: var(--subtle); font-weight: 700; }
+.setup-status.good { color: var(--good); }
+.setup-status.bad { color: #b45309; }
+.setup-card .demo-flip { margin: 8px 0 0; font-size: 0.9rem; }
+html.is-phone .setup-card .demo-flip { display: none !important; }
+.setup-card .other-hand { width: auto; min-height: 40px; margin-top: 4px; padding: 6px 14px; font-size: 0.95rem; color: #2456c9; text-decoration: underline; }
+.setup-card .demo-flip-btn { font-size: 0.95rem; }
+
+/* ---- landscape (a phone on its side, a tablet, a laptop): the words beside the camera ---------------------------- */
+@media (orientation: landscape) {
+  .topbar { height: 50px; }
+  .practice-main { flex-direction: row; align-items: stretch; gap: 14px; padding: 0 14px 12px; }
+  .stage-wrap { align-items: center; }
+  .panel { flex: 0 0 clamp(240px, 34%, 380px); justify-content: center; height: auto; min-height: 0; max-height: none; }
+  .setup-card, #exp-mount { flex: 0 1 auto; }
+  #exp-mount .tutor, #exp-mount .tutor-panel, #exp-mount .tutor-main { height: auto; }
+  #exp-mount .tutor-main, .setup-card { min-height: 150px; }
+}
+@media (min-width: 1000px) and (orientation: landscape) {
+  .screen-practice { max-width: 1240px; margin: 0 auto; }
+  .topbar { height: 64px; padding: 0 16px; }
+  .hud .tutor-cue-wrap { --ring: clamp(80px, 15cqw, 120px); top: 14px; left: 14px; }
+  .hud .tutor-reference { width: clamp(96px, 16cqw, 150px); top: 14px; right: 14px; }
+  #exp-mount .tutor-status { font-size: 1.25rem; }
+}
+
+/* ---- results ----------------------------------------------------------------------------------------------------- */
+.results-inner { align-items: center; text-align: center; justify-content: center; }
+.trophy { position: relative; width: 120px; height: 120px; margin: 10px 0 6px; }
+.trophy-disc {
+  position: absolute; inset: 0; border-radius: 50%; display: grid; place-items: center;
+  background: var(--good); box-shadow: 0 6px 0 var(--good-deep);
+  animation: pop-in 520ms cubic-bezier(.2, .9, .3, 1.4) 1 both;
+}
+.trophy-disc svg { width: 64px; height: 64px; fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.trophy.trophy-partial .trophy-disc { background: var(--accent); box-shadow: 0 6px 0 #c47f0c; }
+.confetti { position: absolute; left: 50%; top: 50%; width: 9px; height: 13px; border-radius: 3px; opacity: 0;
+  animation: confetti 1100ms cubic-bezier(.15, .7, .3, 1) 1 both; animation-delay: var(--delay, 0ms); }
+@keyframes confetti {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(0) rotate(0); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(-1 * var(--d))) rotate(320deg); }
+}
+@keyframes pop-in { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.result-list { list-style: none; margin: 8px 0 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.result-list li {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; text-align: left;
+  background: var(--panel); border-radius: 16px; box-shadow: inset 0 0 0 1px var(--line);
+  animation: rise 400ms ease-out 1 both; animation-delay: var(--delay, 0ms);
+}
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.result-letter { flex: none; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; font-size: 1.6rem; font-weight: 800; background: var(--soft); }
+.result-made .result-letter { background: var(--good-soft); color: var(--good-deep); }
+.result-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.result-text b { font-size: 1rem; }
+.result-text span { font-size: 0.85rem; color: var(--subtle); }
+.result-mark { flex: none; width: 28px; height: 28px; }
+.result-mark svg { width: 100%; height: 100%; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.result-made .result-mark svg { stroke: var(--good); }
+.result-notyet .result-mark svg { stroke: #c9c2b6; }
+
+/* ---- error ------------------------------------------------------------------------------------------------------- */
+.error-inner { justify-content: center; }
+.error-icon { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; background: var(--tip); color: var(--accent-ink); }
+.error-icon svg { width: 40px; height: 40px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.error-body { font-size: 1.02rem; color: #4a453d; }
+.error-body p { margin: 0 0 10px; }
+.error-body ol { margin: 0 0 10px; padding-left: 1.3em; }
+.error-body li { margin: 4px 0; }
+.error-body code { background: var(--soft); padding: 1px 6px; border-radius: 6px; font-size: 0.9em; word-break: break-all; }
+
+/* ---- the quit sheet and the toast -------------------------------------------------------------------------------- */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(27, 25, 22, 0.45); display: flex; align-items: flex-end; justify-content: center; animation: fade .18s ease 1; }
+.sheet {
+  width: 100%; max-width: 520px; padding: 22px 22px calc(var(--safe-b) + 18px); border-radius: 24px 24px 0 0;
+  background: var(--panel); display: flex; flex-direction: column; gap: 10px; text-align: center;
+  animation: sheet-up .24s cubic-bezier(.2, .9, .3, 1) 1;
+}
+.sheet-title { margin: 0; font-size: 1.25rem; font-weight: 800; }
+.sheet-text { margin: 0 0 6px; color: var(--subtle); }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--safe-b) + 24px); z-index: 30; transform: translateX(-50%);
+  padding: 10px 16px; border-radius: 12px; background: #23201b; color: #fff; font-weight: 700; font-size: 0.95rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); animation: fade .18s ease 1;
+}
+.noscript { padding: 24px; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-tile, .confetti, .trophy-disc, .result-list li, .hud .tutor-cue.cue-in, .sheet, .sheet-backdrop { animation: none !important; }
+  .progress-fill { transition: none; }
+}
