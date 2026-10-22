@@ -48,7 +48,10 @@ import { TUTOR_COMMIT_OPTS } from "../experiments/asl-tutor/engine.js";
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
 const HAND = params.get("hand") === "left" ? "left" : "right";
-const LOOK = ["outline", "picture", "hand"].includes(params.get("look")) ? params.get("look") : "glove";
+const LOOK = ["outline", "picture", "hand", "plain"].includes(params.get("look")) ? params.get("look") : "glove";
+/* ?look=plain: the letter and its picture, nothing to fit the hand into and no coaching (asl-demo.js PLAIN). */
+const PLAIN = LOOK === "plain";
+if (PLAIN) document.documentElement.classList.add("look-plain");
 const SHOW_PERF = params.get("fps") === "1";
 const REPLAY = replayRequest(params);
 
@@ -172,7 +175,13 @@ async function renderWelcome() {
   const withGlove = UNIQUE.filter((c) => gloveLetters.has(c));
   const shape = withGlove.length === UNIQUE.length ? "glove" : withGlove.length ? "glove or outline" : "outline";
   for (const el of document.querySelectorAll(".shape-word")) el.textContent = shape;
-  $("#welcome-lede").textContent = `Make each letter with your ${HAND} hand. Your camera checks your handshape and shows you what to change, as you go.`;
+  $("#welcome-lede").textContent = PLAIN
+    ? `Copy each letter's picture with your ${HAND} hand. Your camera checks your handshape.`
+    : `Make each letter with your ${HAND} hand. Your camera checks your handshape and shows you what to change, as you go.`;
+  if (PLAIN) {
+    $("#step-fit").innerHTML = `Copy the letter's picture with your <b>${HAND}</b> hand.`;
+    $("#step-hold").textContent = "Then hold still until the ring around the letter fills.";
+  }
   const hero = $("#hero");
   // the page already shows the default letters' gloves (index.html); rebuilt only for other letters or the other hand
   if (hero.dataset.default === UNIQUE.slice(0, 3).join("") && withGlove.length === UNIQUE.length && HAND === "right") {
@@ -826,7 +835,7 @@ function finish() {
   $("#result-list").innerHTML = rows.map((r, k) => {
     const what = r.correct ? (r.tries <= 1 ? "Made it, first try" : `Made it after ${r.tries} tries`)
       : r.endReason === "skipped" ? "Skipped" : "Not yet";
-    const looks = (r.looks ?? []).filter((c) => c !== r.letter);
+    const looks = PLAIN ? [] : (r.looks ?? []).filter((c) => c !== r.letter);
     return `<li class="${r.correct ? "result-made" : "result-notyet"}" style="--delay:${150 + k * 90}ms">
         <span class="result-letter">${esc(r.letter)}</span>
         <span class="result-text"><b>${what}</b>${looks.length ? `<span>Looked like ${looks.map(esc).join(", ")} on the way</span>` : ""}</span>

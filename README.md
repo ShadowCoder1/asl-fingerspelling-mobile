@@ -12,7 +12,7 @@ MediaPipe; the grader is a small statistical model fitted on public, openly lice
 This teaches fingerspelling handshapes, not ASL. To learn ASL, learn from Deaf teachers. Grading is approximate and
 can be wrong.
 
-Options: `?letters=LXG` (letters, in that order; letters without a glove get an outline), `&look=outline` (no gloves),
+Options: `?look=plain` (no glove or hints: the letter, its picture and the ring), `?letters=LXG` (letters, in that order; letters without a glove get an outline), `&look=outline` (outlines, no gloves),
 `&hand=left`, `&reps=2` (times through), `&fps=1` (frame rate on the camera view).
 
 This folder is a published copy of the running page only.

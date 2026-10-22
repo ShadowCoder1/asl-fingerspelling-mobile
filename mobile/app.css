@@ -220,6 +220,9 @@ body:not(.phase-practice) .hud { visibility: hidden; }
 }
 .hud .tutor-picture { display: block; width: 100%; height: auto; padding: 0; border: 0; border-radius: 10px; background: #fff; }
 .hud .tutor-caption, .hud .tutor-describe, .hud .tutor-mnemonic { display: none !important; }
+/* the plain look: the picture is the only guide, so it is bigger */
+html.look-plain .hud .tutor-reference { width: 118px; }
+@supports (width: 1cqw) { html.look-plain .hud .tutor-reference { width: clamp(100px, 32cqw, 170px); } }
 /* a left-handed session has its glove on the left: the letter and picture go right */
 html.hand-left .hud .tutor-cue-wrap { left: auto; right: 10px; }
 html.hand-left .hud .tutor-reference { left: auto; right: calc(18px + var(--hud-ring)); }

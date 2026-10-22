@@ -141,7 +141,13 @@ const debugOn = params.get("debug") === "1";
  * letter's picture SCHEMATIZED to its clean outline (Indranil, 19 Oct: "more of a schematized outline (no details like
  * knuckles)", so a right hand's skeleton sits inside it); ?look=outline, the outline for every letter; ?look=picture,
  * the whole picture; ?look=hand, the outline of a real hand (experiments/asl-tutor/ghost.js). */
-const LOOK_STYLE = ["outline", "picture", "hand"].includes(params.get("look")) ? params.get("look") : "glove";
+const LOOK_STYLE = ["outline", "picture", "hand", "plain"].includes(params.get("look")) ? params.get("look") : "glove";
+/* ?look=plain (the phone version's version without a glove, 22 Oct; the owner: "the simple clean version where it shows
+ * them the letter and they sign it ... none of the yellow feedback"): nothing drawn to fit the hand into and no live
+ * coaching -- the letter, its picture and the hold ring; a hold that is not the letter is answered "Not quite. Try
+ * again." instead of what to change. When a hold is taken and how it is graded are exactly as in the other looks. */
+const PLAIN = LOOK_STYLE === "plain";
+export const PLAIN_RETRY = "Not quite. Try again.";
 const gloveFor = (letter) => LOOK_STYLE === "glove" && !!session?.glove?.has(letter);
 const shapeWord = () => (LOOK_STYLE === "glove" ? "glove" : "outline");
 // The picture stays in one spot for the hand to fit into (the owner, 19 Oct); ?follow=1 puts it on the hand instead.
@@ -151,7 +157,7 @@ const FOLLOW = params.get("follow") === "1";
 const DOTS = params.get("dots") !== "0";
 // the room dimmed around the hand (JT, 19 Oct): with the outline; not with a glove (Indranil, 20 Oct: "the glove and
 // skeleton are prominent enough"); ?focus=1 / 0 either way, or F
-const FOCUS_ON = params.get("focus") === "1" || (params.get("focus") !== "0" && LOOK_STYLE !== "glove");
+const FOCUS_ON = params.get("focus") === "1" || (params.get("focus") !== "0" && LOOK_STYLE !== "glove" && !PLAIN);
 // a meter per finger (JT's "symbolic" feedback, thinking it through, 19 Oct): off unless ?meters=1 (or M)
 const METERS_ON = params.get("meters") === "1";
 // what the tutor read on each hold (the CHI 2026 paper's decomposition): off unless ?notes=1 (or T)
@@ -227,7 +233,7 @@ export default {
       mountError = err;
     }
     session = { letters, reps, plan: demoPlan(letters, reps), model: null, engine: null, ghost: null, coach: null,
-      ghostOn: params.get("ghost") !== "0", endTrial: null, trial: null, look: null, results: [], made: {} };
+      ghostOn: params.get("ghost") !== "0" && !PLAIN, endTrial: null, trial: null, look: null, results: [], made: {} };
     view = mountTutor(el, { letters, hintPolicy: "strict", layout: "study", hand: HAND });
     /* ONE line of words under the letter (ui.js shows the status line only while there is no feedback): the ghost's
      * live line, except for a moment after the tutor itself says something ("I keep losing your hand"; renderLine).
@@ -348,7 +354,8 @@ export default {
         session.ghost.draw(ctx, canvas, landmarks, trial.letter, HAND, strength, session.look, performance.now());
       }
     }
-    if (DOTS || !session?.ghostOn) drawHand(ctx, canvas, landmarks);
+    // the plain look draws nothing on the camera during a letter (the camera check still shows the hand is tracked)
+    if (!(PLAIN && trial) && (DOTS || !session?.ghostOn)) drawHand(ctx, canvas, landmarks);
     // J and Z: the stroke to draw, from the fingertip, and the fingertip's own trail -- on top of the skeleton
     if (session.ghostOn && trial) safely("J/Z path", () => session.motionGuide?.draw(ctx, canvas, landmarks, trial.letter, performance.now(), guidance()));
   },
@@ -535,7 +542,7 @@ async function loadEverything() {
     style: LOOK_STYLE === "picture" ? "picture" : "outline" });
   const gloves = LOOK_STYLE === "glove" ? await get(GLOVES_PATH, "gloves") : null;
   const pictureLetters = gloves && !LOAD.pictureArtForGloveLetters ? session.letters.filter((L) => !gloves.letters?.[L]) : session.letters;
-  if (LOOK_STYLE !== "hand") await session.picture.load(pictureLetters, pictureUrl);
+  if (LOOK_STYLE !== "hand" && !PLAIN) await session.picture.load(pictureLetters, pictureUrl);
   if (LOOK_STYLE === "glove") {
     session.glove = createGloveGhost({ gloves: gloves.letters, hand: HAND });
     await session.glove.load(session.letters);
@@ -559,7 +566,7 @@ function applyEffects(effects, { trial, addEvent, endTrial }) {
     switch (e.kind) {
       case "cue": view.cue(e); break;
       case "feedback":
-        view.feedback(e, trial.letter);
+        view.feedback(PLAIN && e.tone === "correction" ? { ...e, text: PLAIN_RETRY, tone: "neutral" } : e, trial.letter);
         if (e.tone === "correct") { session.coach.accepted(); setLive(session.coach.look); session.glove?.celebrate(performance.now()); }
         break;
       case "status": view.status(e.text); break;
