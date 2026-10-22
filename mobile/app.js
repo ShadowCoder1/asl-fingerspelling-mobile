@@ -34,12 +34,16 @@
  *      ?fps=1 (frame rate and per-frame cost on the camera view), ?replay=<file.json> (a recorded session instead of
  *      the camera, for tests; js/core/replay.js). */
 
-import exp, { DEFAULT_LETTERS, parseDemoLetters, parseDemoReps, demoPlan } from "../experiments/asl-demo.js";
+import exp, { DEFAULT_LETTERS, parseDemoLetters, parseDemoReps, demoPlan, LOAD } from "../experiments/asl-demo.js";
 import { createTracker } from "../js/core/tracker.js";
 import { MEDIAPIPE } from "../config.js";
 import { runTrialLoop } from "../js/core/trial-loop.js";
 import { pictureUrl } from "../tutor/letters.js";
 import { replayRequest, loadReplay, createReplay } from "../js/core/replay.js";
+import { shapeDistance, DEFAULTS as COMMIT_DEFAULTS, MIN_PALM_EXIT_FACTOR } from "../tutor/commit.js";
+import { flattenRounded, DECIMALS, toPoints } from "../tutor/landmarks.js";
+import { palmSize } from "../tutor/hand-frame.js";
+import { TUTOR_COMMIT_OPTS } from "../experiments/asl-tutor/engine.js";
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -51,6 +55,16 @@ const REPLAY = replayRequest(params);
 /* The camera check: the asked-for hand in view this long, and it moves on by itself. */
 const CHECK_HOLD_MS = 1000;
 const CHECK_DONE_MS = 650;
+/* After the check, the hand that passed it is still up: the first letter waits until it has gone down (out of view for
+ * LOWER_GONE_MS) or changed shape (COMMIT_DEFAULTS.heldOverShape, the rule the engine applies to a pose carried into
+ * every later letter), at most LOWER_MAX_MS. Otherwise the open hand held up for the check is graded as the first try
+ * (the review, 22 Oct; on the laptop the instructions page comes in between). */
+const LOWER_GONE_MS = 300;
+const LOWER_MAX_MS = 4000;
+/* The other hand in view this long before "I sign with my left hand" is offered (a moment's misread is not a choice). */
+const OTHER_HAND_OFFER_MS = 1500;
+/* A hand seen within this long still counts as there (single dropped frames do not restart the check). */
+const SEEN_GRACE_MS = 250;
 /* No hand for this long in the camera check: say what usually fixes it. */
 const CHECK_HINT_MS = 8000;
 const NO_HAND_HINT = "We can't see a hand yet. Move somewhere brighter, and keep your whole hand in the picture.";
@@ -85,6 +99,7 @@ function show(screen) {
   document.body.dataset.screen = screen;
   stats.screen = screen;
   window.scrollTo(0, 0);
+  if (screen === "results" || screen === "error") $(`#${screen} h1`)?.focus({ preventScroll: true });
 }
 function phase(p) {
   document.body.classList.toggle("phase-setup", p === "setup");
@@ -105,8 +120,9 @@ const UA = navigator.userAgent || "";
 const IOS = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const ANDROID = /Android/i.test(UA);
 const IN_APP = (() => {
+  const plain = (IOS && !/Safari\//.test(UA) && !navigator.standalone) || (ANDROID && /; wv\)/.test(UA));
   const m = UA.match(/\b(FBAN|FBAV|FB_IAB|Instagram|LinkedInApp|Snapchat|TikTok|musical_ly|BytedanceWebview|Line\/|KAKAOTALK|MicroMessenger|Pinterest|Twitter)\b/i);
-  if (!m) return null;
+  if (!m) return plain ? "this app" : null;
   const k = m[1].toLowerCase();
   return k.startsWith("fb") ? "Facebook" : k === "instagram" ? "Instagram" : k === "linkedinapp" ? "LinkedIn" : k.includes("tiktok") || k.includes("musical") || k.includes("bytedance") ? "TikTok" : "this app";
 })();
@@ -115,6 +131,22 @@ const BROWSER = IOS ? "Safari" : ANDROID ? "Chrome" : "your browser";
  * hand: it is offered as the hand to use (?hand=left), and the laptop's "flip the camera" offer is not shown. */
 const PHONE = IOS || ANDROID;
 if (PHONE) document.documentElement.classList.add("is-phone");
+/* A link carrying ?srcmirror=1 (made on a laptop whose camera mirrors; this site shares its storage, and so its
+ * remembered flip, with the laptop demos) would flip every phone's hand, and the undo is not shown on a phone: a phone
+ * is never flipped. "0", not removed, so asl-demo.js's remembered flip cannot put it back. */
+if (PHONE && params.get("srcmirror") === "1") {
+  const q = new URLSearchParams(location.search);
+  q.set("srcmirror", "0");
+  location.replace(`?${q}`);
+}
+if (HAND === "left") document.documentElement.classList.add("hand-left");
+/* The link to pass on: without this device's own settings or the testing options. */
+function shareableUrl() {
+  const q = new URLSearchParams(location.search);
+  for (const k of ["srcmirror", "autostart", "ping", "fps", "vfc", "replay", "debug"]) q.delete(k);
+  const qs = q.toString();
+  return `${location.origin}${location.pathname}${qs ? `?${qs}` : ""}`;
+}
 
 /* ---- welcome ------------------------------------------------------------------------------------------------------- */
 function listWords(xs) {
@@ -126,6 +158,7 @@ let gloveLetters = new Set();
 async function renderWelcome() {
   $("#welcome-letters").textContent = listWords(UNIQUE);
   $("#step-hand").textContent = HAND;
+  $("#step-phone-hand").textContent = HAND === "right" ? "left" : "right";
   $("#setup-title").textContent = `Hold up your ${HAND} hand`;
   if (LOOK === "glove") {
     try {
@@ -134,9 +167,15 @@ async function renderWelcome() {
     } catch { /* no gloves: the outline everywhere */ }
   }
   const withGlove = UNIQUE.filter((c) => gloveLetters.has(c));
-  $("#step-shape").textContent = withGlove.length === UNIQUE.length ? "glove" : withGlove.length ? "glove or outline" : "outline";
+  const shape = withGlove.length === UNIQUE.length ? "glove" : withGlove.length ? "glove or outline" : "outline";
+  for (const el of document.querySelectorAll(".shape-word")) el.textContent = shape;
   $("#welcome-lede").textContent = `Make each letter with your ${HAND} hand. Your camera checks your handshape and shows you what to change, as you go.`;
   const hero = $("#hero");
+  // the page already shows the default letters' gloves (index.html); rebuilt only for other letters or the other hand
+  if (hero.dataset.default === UNIQUE.slice(0, 3).join("") && withGlove.length === UNIQUE.length && HAND === "right") {
+    if (IN_APP) { $("#inapp-browser").textContent = BROWSER; $("#inapp-note").hidden = false; }
+    return;
+  }
   hero.innerHTML = "";
   for (const c of UNIQUE.slice(0, 3)) {
     const tile = document.createElement("div");
@@ -168,48 +207,74 @@ function setLoad(frac, text) {
   if (stageWaiting === "tracker") stageMessage(`Loading the hand tracker… ${Math.round(f * 100)}%`);
 }
 const progressOf = new Map();
-async function download(url, bytes) {
-  const res = await fetch(url);
-  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} for ${url}`);
-  const reader = res.body.getReader();
-  const parts = [];
-  let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    parts.push(value);
-    got += value.byteLength;
-    progressOf.set(url, [Math.min(got, bytes), bytes]);
-    let a = 0, b = 0;
-    for (const [x, y] of progressOf.values()) { a += x; b += y; }
-    setLoad(0.9 * (a / b), "Getting the hand tracker ready…");
-  }
-  const out = new Uint8Array(got);
-  let o = 0;
-  for (const p of parts) { out.set(p, o); o += p.byteLength; }
-  return out;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function showLoad(text) {
+  let a = 0, b = 0;
+  for (const [x, y] of progressOf.values()) { a += x; b += y; }
+  setLoad(b ? 0.9 * (a / b) : 0, text);
 }
+/* One of MediaPipe's two files, with the progress line. A response that stops sending for STALL_MS is given up and
+ * tried again (three tries, a moment apart): on a phone a download that goes quiet without failing is ordinary (a
+ * fading signal, a switch to another app). The runtime comes back as a Blob built from its chunks and the model as
+ * bytes in one buffer sized up front, so the peak memory is about one copy of each. */
+const STALL_MS = 15000;
+async function download(url, bytes, { asBlob = false } = {}) {
+  let last = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) { progressOf.set(url, [0, bytes]); showLoad("Slow connection, trying again…"); await sleep(1000 * attempt); }
+    const ctrl = new AbortController();
+    let timer = null;
+    const arm = () => { clearTimeout(timer); timer = setTimeout(() => ctrl.abort(), STALL_MS); };
+    try {
+      arm();
+      const res = await fetch(url, { signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.body) { const whole = asBlob ? await res.blob() : new Uint8Array(await res.arrayBuffer()); clearTimeout(timer); return whole; }
+      const reader = res.body.getReader();
+      const parts = [];
+      let out = asBlob ? null : new Uint8Array(bytes), got = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        arm();
+        if (asBlob) parts.push(value);
+        else {
+          if (got + value.byteLength > out.length) { const more = new Uint8Array(Math.ceil((got + value.byteLength) * 1.25)); more.set(out.subarray(0, got)); out = more; }
+          out.set(value, got);
+        }
+        got += value.byteLength;
+        progressOf.set(url, [Math.min(got, bytes), bytes]);
+        showLoad("Getting the hand tracker ready…");
+      }
+      clearTimeout(timer);
+      return asBlob ? new Blob(parts, { type: "application/wasm" }) : out.subarray(0, got);
+    } catch (err) {
+      clearTimeout(timer);
+      last = err;
+    }
+  }
+  const e = new Error(`Could not load the hand tracker (${last?.name === "AbortError" ? "the download stalled" : last?.message || last}).`);
+  e.kind = "load";
+  throw e;
+}
+/* The runtime's blob URL is kept for the page's life: tracker.js keeps the file set it was first given, and a tracker
+ * rebuilt after a lost GPU (track() below) loads its runtime from it again. */
 const trackerReady = (async () => {
   if (REPLAY.valid) return null;
-  let given = {}, blobUrl = null;
-  try {
-    const { FilesetResolver } = await import(`${CDN}/vision_bundle.mjs`);
-    const simd = await FilesetResolver.isSimdSupported();
-    const name = `vision_wasm${simd ? "" : "_nosimd"}_internal`;
-    progressOf.set(`${CDN}/wasm/${name}.wasm`, [0, simd ? WASM_BYTES.simd : WASM_BYTES.nosimd]);
-    progressOf.set(MEDIAPIPE.models.hand, [0, MODEL_BYTES]);
-    const [wasm, model] = await Promise.all([
-      download(`${CDN}/wasm/${name}.wasm`, simd ? WASM_BYTES.simd : WASM_BYTES.nosimd),
-      download(MEDIAPIPE.models.hand, MODEL_BYTES),
-    ]);
-    blobUrl = URL.createObjectURL(new Blob([wasm], { type: "application/wasm" }));
-    given = { fileset: { wasmLoaderPath: `${CDN}/wasm/${name}.js`, wasmBinaryPath: blobUrl }, modelAssetBuffer: model };
-  } catch (err) {
-    console.warn(`mobile: download failed, the tracker will fetch its own files (${err?.message || err})`);
-  }
+  const { FilesetResolver } = await import(`${CDN}/vision_bundle.mjs`);
+  const simd = await FilesetResolver.isSimdSupported();
+  const name = `vision_wasm${simd ? "" : "_nosimd"}_internal`;
+  const wasmUrl = `${CDN}/wasm/${name}.wasm`, wasmBytes = simd ? WASM_BYTES.simd : WASM_BYTES.nosimd;
+  progressOf.set(wasmUrl, [0, wasmBytes]);
+  progressOf.set(MEDIAPIPE.models.hand, [0, MODEL_BYTES]);
+  const [wasm, model] = await Promise.all([download(wasmUrl, wasmBytes, { asBlob: true }), download(MEDIAPIPE.models.hand, MODEL_BYTES)]);
+  const blobUrl = URL.createObjectURL(wasm);
   setLoad(0.93, "Starting the hand tracker…");
-  const tracker = await createTracker(exp.tracker ?? "hand", { ...(exp.trackerOptions ?? {}), ...given });
-  if (blobUrl) URL.revokeObjectURL(blobUrl);
+  const tracker = await createTracker(exp.tracker ?? "hand", {
+    ...(exp.trackerOptions ?? {}),
+    fileset: { wasmLoaderPath: `${CDN}/wasm/${name}.js`, wasmBinaryPath: blobUrl },
+    modelAssetBuffer: model,
+  });
   stats.delegate = tracker.delegate;
   await warmUp(tracker);
   setLoad(1, "Ready");
@@ -217,7 +282,18 @@ const trackerReady = (async () => {
   else $("#loadline").classList.add("loadline-done");
   return tracker;
 })();
-trackerReady.catch(() => {});
+/* A load that failed is said on the welcome screen at once, and Start becomes a reload, rather than surfacing only
+ * after the camera prompt. */
+let loadError = null;
+function loadFailed(err) {
+  if (loadError) return;
+  loadError = err;
+  if (stats.screen !== "welcome") return;
+  $("#loadline").classList.remove("loadline-done");
+  $("#loadline-text").textContent = "Couldn't load the hand tracker. Check your connection, then try again.";
+  $("#btn-start").textContent = "Try again";   // start() reloads
+}
+trackerReady.catch((err) => loadFailed(err));
 
 /* The first picture with a hand in it compiles the hand model's GPU programs: up to a second or two on a phone, which
  * would freeze the first camera frame. A glove render is a hand MediaPipe finds (X: 26 of 28), so do it now. Nothing
@@ -252,8 +328,9 @@ const cueWrap = $("#exp-mount .tutor-cue-wrap");
 const reference = $("#tutor-reference");
 if (cueWrap) hud.append(cueWrap);
 if (reference) hud.append(reference);
-const firstTrial = planError ? Promise.reject(planError) : exp.nextTrial(0);
-firstTrial.catch(() => {});
+LOAD.pictureArtForGloveLetters = false;
+let firstTrial = planError ? Promise.reject(planError) : exp.nextTrial(0);
+firstTrial.catch((err) => { if (!planError) loadFailed(err); });
 
 /* ---- sound and a buzz --------------------------------------------------------------------------------------------- */
 let audio = null;
@@ -293,7 +370,6 @@ function chime(kind) {
 function renderSound() {
   const b = $("#btn-sound");
   b.setAttribute("aria-pressed", String(soundOn));
-  b.setAttribute("aria-label", soundOn ? "Sound is on" : "Sound is off");
 }
 
 /* ---- the camera ---------------------------------------------------------------------------------------------------- */
@@ -317,23 +393,54 @@ async function openCamera() {
   video.srcObject = stream;
   video.muted = true;
   video.playsInline = true;
-  try { await video.play(); } catch { /* autoplay of a muted inline video is allowed; play() can still reject once */ }
+  // play() settles only once a picture arrives: a camera held by a call never sends one, so it is not awaited unbounded
+  await Promise.race([video.play().catch(() => {}), sleep(5000)]);
   for (let i = 0; i < 100 && !(video.videoWidth > 0); i++) await new Promise((r) => setTimeout(r, 50));
   if (!(video.videoWidth > 0)) throw new CameraError("NoFrames");
   stats.video = { w: video.videoWidth, h: video.videoHeight, settings: track?.getSettings?.() ?? null };
+  watchFrames();
 }
+/* When the camera last showed a frame (requestVideoFrameCallback; without it the watchdog stays off). */
+let aliveAt = 0, aliveGen = 0;
+function watchFrames() {
+  if (typeof video.requestVideoFrameCallback !== "function") return;
+  const g = ++aliveGen;
+  aliveAt = performance.now();
+  const tick = () => video.requestVideoFrameCallback(() => { if (g !== aliveGen) return; aliveAt = performance.now(); tick(); });
+  tick();
+}
+/* A camera that stops sending frames while the page is in view (taken by another app, stalled after Control Center or
+ * a lock) is reopened, at most every few seconds. */
+const STALL_FRAMES_MS = 2500;
+let reopenedAt = 0;
+setInterval(() => {
+  if (document.visibilityState !== "visible" || !stream || resuming || halted || REPLAY.valid || !aliveAt) return;
+  if (stats.screen !== "practice") return;
+  const now = performance.now();
+  if (now - aliveAt > STALL_FRAMES_MS && now - reopenedAt > 6000) { reopenedAt = now; resumeCamera(true); }
+}, 1000);
 function stopCamera() {
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   video.srcObject = null;
 }
 let resuming = null;
-function resumeCamera() {
+/* After a lock, an app switch or a stall: play again, or reopen the camera (`force`: even if the track says it is
+ * live). A camera just let go by another app can refuse once, so a reopen is tried three times before the error page. */
+function resumeCamera(force = false) {
   resuming ??= (async () => {
     try {
       const track = stream?.getVideoTracks()[0];
-      if (!track || track.readyState === "ended") { stopCamera(); await openCamera(); layout(); }
-      else if (video.paused) await video.play().catch(() => {});
+      if (force || !track || track.readyState === "ended") {
+        for (let attempt = 0; ; attempt++) {
+          try { stopCamera(); await openCamera(); break; }
+          catch (err) { if (attempt >= 2) throw err; await sleep(700); }
+        }
+        layout();
+        clock?.rearm();
+      } else if (video.paused) {
+        await Promise.race([video.play().catch(() => {}), sleep(3000)]);
+      }
     } catch (err) {
       fail(err);
     } finally { resuming = null; }
@@ -345,27 +452,41 @@ function resumeCamera() {
 /* With requestVideoFrameCallback each camera frame is flagged once, as it is shown, and the loop (on the screen's
  * repaints, like the laptop's) processes it once. The laptop's own test -- has the media time moved? -- is true on
  * nearly every repaint (measured in Chrome: 283 of 285 repaints with a 30 fps camera), so it re-tracks each picture
- * about twice. It is still the test whenever the callback has not fired for a second (before the first one, after the
- * page was blocked, or a browser where it goes quiet), and the callback takes over again as soon as it fires. A replay
- * has no pictures: one recorded frame per tick of its own frame rate, as js/core/experiment.js does. */
+ * about twice; it is used only until the first callback, or where there is none. Once the callbacks have started they
+ * are the only test: a picture that stops coming (a camera stalled or interrupted) is not re-tracked, since a frozen
+ * picture is a perfectly still hand and the ring would take it; if they go quiet for a second the chain is armed again
+ * (one chain counts, by generation). Nothing is tracked while the video has no picture (a camera being reopened). A
+ * replay has no pictures: one recorded frame per tick of its own frame rate, with the laptop's test, as
+ * js/core/experiment.js runs it (it stops when the recording does). */
 const VFC_QUIET_MS = 1000;
 /* Set when the error page goes up: the frame loops stop where they are (the page is reloaded to go on). */
 let halted = false;
 function createClock(src, replayFps = null) {
+  const next = (wait) => (halted ? new Promise(() => {}) : new Promise(wait));
   if (replayFps) {
     const ms = 1000 / replayFps;
-    return { hasNew: () => true, done() {}, next: () => new Promise((r) => setTimeout(r, ms)) };
+    let last = -1;
+    return { hasNew: () => src.currentTime !== last, done() { last = src.currentTime; }, rearm() {}, next: () => next((r) => setTimeout(r, ms)) };
   }
-  let seq = 0, doneSeq = 0, lastTime = -1, vfcAt = -Infinity;
+  let seq = 0, doneSeq = 0, lastTime = -1, vfcAt = -Infinity, gen = 0;
   // ?vfc=0: the laptop's test only (for comparing the two hosts frame for frame)
-  if (typeof src.requestVideoFrameCallback === "function" && params.get("vfc") !== "0") {
-    const arm = () => src.requestVideoFrameCallback(() => { seq++; vfcAt = performance.now(); arm(); });
-    arm();
-  }
+  const vfc = typeof src.requestVideoFrameCallback === "function" && params.get("vfc") !== "0";
+  const arm = () => {
+    const g = ++gen;
+    const tick = () => src.requestVideoFrameCallback(() => { if (g !== gen) return; seq++; vfcAt = performance.now(); tick(); });
+    tick();
+  };
+  if (vfc) arm();
   return {
-    hasNew: () => (performance.now() - vfcAt < VFC_QUIET_MS ? seq !== doneSeq : src.currentTime !== lastTime),
+    hasNew() {
+      if (!(src.readyState >= 2 && src.videoWidth > 0)) return false;
+      if (vfcAt === -Infinity) return src.currentTime !== lastTime;
+      if (performance.now() - vfcAt > VFC_QUIET_MS) { vfcAt = performance.now(); arm(); }
+      return seq !== doneSeq;
+    },
     done() { doneSeq = seq; lastTime = src.currentTime; },
-    next: () => (halted ? new Promise(() => {}) : new Promise((r) => requestAnimationFrame(() => r()))),
+    rearm() { if (vfc) { vfcAt = performance.now(); arm(); } },
+    next: () => next((r) => requestAnimationFrame(() => r())),
   };
 }
 
@@ -404,8 +525,10 @@ function layout() {
   stage.style.aspectRatio = "auto";
   stage.style.width = `${w}px`;
   stage.style.height = `${h}px`;
-  // the drawing at up to 2 canvas pixels per camera pixel: crisp lines on a phone screen without a huge canvas
-  const k = Math.max(1, Math.min(2, (w * (window.devicePixelRatio || 1)) / srcW));
+  // the drawing at the screen's pixel density, at most 2 canvas pixels per camera pixel: crisp lines on a phone without a
+  // huge canvas; not tied to the view's size, so a palm keeps its size on the canvas when the phone turns
+  // (glove.js and picture-ghost.js ease their size in canvas pixels)
+  const k = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   const cw = Math.round(srcW * k), ch = Math.round(srcH * k);
   if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
 }
@@ -427,9 +550,36 @@ function handIndex(res, vi) {
     return 0;
   }
 }
+const NO_HANDS = Object.freeze({ landmarks: [], worldLandmarks: [], handedness: [], handednessScore: [] });
+let rebuilding = null;
+/* tracker.js gives up after ~3 s of failed frames (a GPU context lost when the phone was locked: WebKit lost them on
+ * some iOS versions). Rather than end the session, build a new tracker (from the kept runtime and the model's cached
+ * download) and carry on; only a failed rebuild, or a third loss, ends it. */
+function rebuildTracker(err) {
+  if (rebuilding) return;
+  if (REPLAY.valid || (stats.rebuilt ?? 0) >= 2) { fail(err); return; }
+  rebuilding = (async () => {
+    stageMessage("Restarting the hand tracker…");
+    try {
+      const t = await createTracker(exp.tracker ?? "hand", { ...(exp.trackerOptions ?? {}) });
+      try { tracker.close(); } catch { /* already gone */ }
+      tracker = t;
+      stats.rebuilt = (stats.rebuilt ?? 0) + 1;
+      stageMessage(null);
+    } catch (e) {
+      fail(e);
+    } finally {
+      rebuilding = null;
+    }
+  })();
+}
 function track() {
   const t0 = performance.now();
-  const res = tracker.track(src, performance.now());
+  let res = NO_HANDS;
+  if (!rebuilding) {
+    try { res = tracker.track(src, performance.now()); }
+    catch (err) { rebuildTracker(err); }
+  }
   const vi = sourceSize(src);
   if (canvas.width / canvas.height > 1 !== vi.aspect > 1 || Math.abs(canvas.width / canvas.height - vi.aspect) > 0.01) layout();
   stats.trackMs.push(performance.now() - t0);
@@ -438,46 +588,98 @@ function track() {
   return { res, vi };
 }
 
+/* ---- the hand's size, as the ring measures it ---------------------------------------------------------------------- */
+/* tutor/commit.js will not start a hold while the palm (in the picture's short side, the median of the last 5 frames)
+ * is under TUTOR_COMMIT_OPTS.minPalm, and lets go only above it times MIN_PALM_EXIT_FACTOR. The tutor says "Move your
+ * hand closer." once, for 2.5 s, and meanwhile the glove can turn green from a size the grader still reads: so the
+ * camera check and the camera view say "closer" exactly while no hold could start, by the same numbers. */
+const PALM_MIN = TUTOR_COMMIT_OPTS.minPalm, PALM_EXIT = PALM_MIN * MIN_PALM_EXIT_FACTOR;
+function createSizeWatch() {
+  let rows = [], small = false;
+  const median = (v) => { const a = v.length % 2 ? v : v.slice(1); return [...a].sort((x, y) => x - y)[(a.length - 1) / 2]; };
+  return (lm, aspect) => {
+    if (!lm) { rows = []; small = false; return false; }
+    const S = palmSize(toPoints(flattenRounded(lm, DECIMALS), aspect)) / (aspect < 1 ? aspect : 1);
+    if (!(S > 0)) return small;
+    rows.push(S);
+    if (rows.length > 5) rows.shift();
+    const m = median(rows);
+    if (!small && m < PALM_MIN) small = true;
+    else if (small && m > PALM_EXIT) small = false;
+    return small;
+  };
+}
+
 /* ---- the camera check: the asked-for hand in view for a moment, then straight on ---------------------------------- */
+const OTHER = HAND === "right" ? "left" : "right";
 async function cameraCheck() {
   phase("setup");
   const status = $("#setup-status");
-  let since = null, lastHandAt = performance.now();
+  const say = (text, tone = "") => {
+    if (status.textContent !== text) status.textContent = text;
+    const c = `setup-status${tone ? ` ${tone}` : ""}`;
+    if (status.className !== c) status.className = c;
+  };
+  const sizeOf = createSizeWatch();
+  const draw = (lm) => { ctx.clearRect(0, 0, canvas.width, canvas.height); exp.draw(ctx, { landmarks: lm, canvas, trial: null, tMs: 0 }); };
+  let since = null, seenAt = -Infinity, lastHandAt = performance.now(), objectionSince = null, passPose = null;
   for (;;) {
     if (clock.hasNew()) {
       clock.done();
       const { res, vi } = track();
       const k = handIndex(res, vi);
       const lm = k >= 0 ? res.landmarks[k] : null;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      exp.draw(ctx, { landmarks: lm, canvas, trial: null, tMs: 0 });
+      draw(lm);
       let objection = null;
       if (k >= 0) {
         try { objection = exp.handProblem?.(res, k, { aspect: vi.aspect, demographics: {} }) ?? null; }
         catch (err) { console.warn("handProblem failed; letting the hand pass", err); }
       }
-      const seen = k >= 0 && !objection;
-      if (seen && since === null) since = performance.now();
-      if (!seen) since = null;
-      const held = since === null ? 0 : performance.now() - since;
-      if (held >= CHECK_HOLD_MS) {
-        status.textContent = "Great, let's start!";
-        status.className = "setup-status good";
+      const now = performance.now();
+      const small = sizeOf(objection ? null : lm, vi.aspect);
+      objectionSince = objection ? objectionSince ?? now : null;
+      otherHandOffer.hidden = !(objectionSince !== null && now - objectionSince >= OTHER_HAND_OFFER_MS);
+      if (lm) lastHandAt = now;
+      if (lm && !objection && !small) seenAt = now;
+      const present = now - seenAt < SEEN_GRACE_MS;
+      if (!present) since = null;
+      else since ??= now;
+      if (since !== null && lm && !objection && now - since >= CHECK_HOLD_MS) {
+        passPose = toPoints(flattenRounded(lm, DECIMALS), vi.aspect);
         break;
       }
-      if (seen || objection) lastHandAt = performance.now();
-      const lost = performance.now() - lastHandAt > CHECK_HINT_MS;
-      status.textContent = objection ?? (seen ? "Hold it there…" : lost ? NO_HAND_HINT : "Hold it up in front of the camera, where you can see it on screen.");
-      status.className = `setup-status${objection ? " bad" : seen ? " good" : ""}`;
-      if (objection) otherHandOffer.hidden = false;
+      if (objection) say(PHONE ? `That looks like your ${OTHER} hand. Hold the phone in your ${OTHER} hand, and hold up your ${HAND}.` : objection, "bad");
+      else if (small) say("Bring your hand a little closer to the camera.", "bad");
+      else if (present) say("Hold it there…", "good");
+      else say(now - lastHandAt > CHECK_HINT_MS ? NO_HAND_HINT : "Hold it up in front of the camera, where you can see it on screen.");
     }
     await clock.next();
   }
-  await new Promise((r) => setTimeout(r, CHECK_DONE_MS));
+  otherHandOffer.hidden = true;
+  // the hand that passed goes down (or changes shape) before the first letter can take a hold
+  say("Great! Now lower your hand to begin.", "good");
+  const t0 = performance.now();
+  let goneAt = null;
+  while (performance.now() - t0 < LOWER_MAX_MS) {
+    if (clock.hasNew()) {
+      clock.done();
+      const { res, vi } = track();
+      const k = handIndex(res, vi);
+      const lm = k >= 0 ? res.landmarks[k] : null;
+      draw(lm);
+      if (!lm) {
+        goneAt ??= performance.now();
+        if (performance.now() - goneAt >= LOWER_GONE_MS) break;
+      } else {
+        goneAt = null;
+        if (shapeDistance(passPose, toPoints(flattenRounded(lm, DECIMALS), vi.aspect)) > TUTOR_COMMIT_OPTS.heldOverShape) break;
+      }
+    }
+    await clock.next();
+  }
 }
 
 /* "I sign with my left hand": the same link with ?hand= switched, straight back into the camera check. */
-const OTHER = HAND === "right" ? "left" : "right";
 const otherHandOffer = (() => {
   const b = document.createElement("button");
   b.type = "button";
@@ -503,10 +705,18 @@ function setProgress(n) {
   const fill = $("#progress-fill"), total = PLAN.length || 1;
   fill.style.width = `${Math.round((100 * doneCount) / total)}%`;
   fill.classList.toggle("progress-zero", doneCount === 0);
-  $("#progress").setAttribute("aria-valuenow", String(doneCount));
+  const bar = $("#progress");
+  bar.setAttribute("aria-valuemax", String(PLAN.length));
+  bar.setAttribute("aria-valuenow", String(doneCount));
+  bar.setAttribute("aria-valuetext", `${doneCount} of ${PLAN.length} letters`);
 }
+const hudNote = $("#hud-note");
+let trialStartedAt = 0;
 async function recordTrial(trial, state) {
   const durationMs = (trial.durationSec ?? 15) * 1000;
+  const sizeOf = createSizeWatch();
+  let noteOn = false;
+  trialStartedAt = performance.now();
   const { endReason } = await runTrialLoop({
     durationMs,
     now: () => performance.now(),
@@ -515,23 +725,35 @@ async function recordTrial(trial, state) {
     step: (tMs, endTrial) => {
       clock.done();
       endCurrent = endTrial;
-      const { res, vi } = track();
-      const t1 = performance.now();
-      const k = handIndex(res, vi);
-      const lm = k >= 0 ? res.landmarks[k] ?? null : null;
-      const wl = k >= 0 ? res.worldLandmarks[k] ?? null : null;
-      const handedness = k >= 0 ? res.handedness[k] ?? null : null;
-      const handednessScore = k >= 0 ? res.handednessScore?.[k] ?? null : null;
-      const derived = exp.onFrame?.({ landmarks: lm, worldLandmarks: wl, handedness, handednessScore, tMs, trial, state, addEvent: noop, endTrial, video: vi }) ?? {};
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      exp.draw(ctx, { landmarks: lm, derived, state, trial, canvas, tMs, setReadout: noop });
-      stats.tutorMs.push(performance.now() - t1);
-      if (stats.tutorMs.length > 600) stats.tutorMs.splice(0, 300);
+      try { frame(tMs, endTrial); frameErrors = 0; }
+      catch (err) {
+        if (++frameErrors === 1) console.error("mobile: a frame failed and was skipped", err);
+        if (frameErrors >= 30) throw err;
+      }
     },
   });
   endCurrent = null;
+  hudNote.hidden = true;
   return endReason;
+
+  function frame(tMs, endTrial) {
+    const { res, vi } = track();
+    const t1 = performance.now();
+    const k = handIndex(res, vi);
+    const lm = k >= 0 ? res.landmarks[k] ?? null : null;
+    const wl = k >= 0 ? res.worldLandmarks[k] ?? null : null;
+    const handedness = k >= 0 ? res.handedness[k] ?? null : null;
+    const handednessScore = k >= 0 ? res.handednessScore?.[k] ?? null : null;
+    const derived = exp.onFrame?.({ landmarks: lm, worldLandmarks: wl, handedness, handednessScore, tMs, trial, state, addEvent: noop, endTrial, video: vi }) ?? {};
+    const small = sizeOf(lm, vi.aspect);
+    if (small !== noteOn) { noteOn = small; hudNote.hidden = !small; }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    exp.draw(ctx, { landmarks: lm, derived, state, trial, canvas, tMs, setReadout: noop });
+    stats.tutorMs.push(performance.now() - t1);
+    if (stats.tutorMs.length > 600) stats.tutorMs.splice(0, 300);
+  }
 }
+let frameErrors = 0;
 async function practice() {
   phase("practice");
   $("#practice-actions").hidden = false;
@@ -566,27 +788,33 @@ new MutationObserver(() => {
 }).observe($("#tutor-feedback") ?? document.body, { attributes: true, attributeFilter: ["class"] });
 const cue = $("#tutor-cue");
 if (cue) {
+  cue.removeAttribute("aria-label");
   new MutationObserver(() => {
     cue.classList.remove("cue-in");
     void cue.offsetWidth;
     cue.classList.add("cue-in");
+    if (/^[A-Z]$/.test(cue.textContent)) $("#announce").textContent = `Next letter: ${cue.textContent}`;
   }).observe(cue, { childList: true, characterData: true, subtree: true });
 }
 
 /* ---- the end ----------------------------------------------------------------------------------------------------- */
 const CHECK_SVG = `<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
 const DASH_SVG = `<svg viewBox="0 0 24 24"><path d="M7 12h10"/></svg>`;
+const HAND_SVG = `<svg viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12m0-1V4a1.5 1.5 0 0 1 3 0v7m0-.5V5.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6.5 7S6 18.5 5 16l-1.6-3.3a1.4 1.4 0 0 1 2.4-1.4L8 14"/></svg>`;
 function finish() {
   stopCamera();
   const rows = stats.summaries;
   const made = rows.filter((r) => r.correct).length;
   const all = rows.length;
-  $("#results-title").textContent = made === all && all ? "Nice work!" : made ? "Good practice!" : "Keep at it!";
-  $("#results-lede").textContent = `You made ${made} of ${all} letter${all === 1 ? "" : "s"}.`;
+  const skippedAll = all > 0 && rows.every((r) => !r.correct && r.endReason === "skipped");
+  $("#results-title").textContent = made === all && all ? "Nice work!" : made ? "Good practice!" : "Good start!";
+  $("#results-lede").textContent = made ? `You made ${made} of ${all} letter${all === 1 ? "" : "s"}.`
+    : skippedAll ? `You skipped ${all === 1 ? "the letter" : `all ${all} letters`}. Try them now?`
+    : `You tried ${all} letter${all === 1 ? "" : "s"}. They get easier with practice.`;
   const trophy = $("#trophy");
   trophy.className = `trophy${made === all ? "" : " trophy-partial"}`;
   const colors = ["#1e9e6a", "#f5a524", "#38bdf8", "#a78bfa", "#f472b6", "#34d399"];
-  trophy.innerHTML = `<div class="trophy-disc">${made ? CHECK_SVG : `<svg viewBox="0 0 24 24"><path d="M8 13.5c1-1.3 2.4-2 4-2s3 .7 4 2"/><path d="M9 9h.01M15 9h.01"/></svg>`}</div>`
+  trophy.innerHTML = `<div class="trophy-disc">${made ? CHECK_SVG : HAND_SVG}</div>`
     + (made ? Array.from({ length: 18 }, (_, k) => `<i class="confetti" style="--a:${k * 20}deg;--d:${70 + (k % 3) * 18}px;--delay:${120 + (k % 4) * 40}ms;background:${colors[k % colors.length]}"></i>`).join("") : "");
   const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   $("#result-list").innerHTML = rows.map((r, k) => {
@@ -618,7 +846,8 @@ function errorCopy(err) {
         <p>Open the page in <b>${BROWSER}</b>: ${IN_APP ? "tap the <b>•••</b> menu and choose <b>Open in browser</b>, or " : ""}copy the link and paste it there.</p>` };
   }
   if (kind === "NotAllowedError" || kind === "SecurityError" || kind === "PermissionDeniedError") {
-    return { title: "Allow the camera", body: `<p>The camera is how the app sees your hand. Nothing is recorded or sent anywhere.</p>${browserSteps}` };
+    return { title: "Allow the camera", copy: true, body: `<p>The camera is how the app sees your hand. Nothing is recorded or sent anywhere.</p>${browserSteps}
+      <p>Opened from another app? Then open the page in <b>${BROWSER}</b> instead: copy the link and paste it there.</p>` };
   }
   if (kind === "NotReadableError" || kind === "TrackStartError" || kind === "AbortError") {
     return { title: "Your camera is busy", body: `<p>Another app may be using the camera (a video call, the Camera app). Close it, then try again.</p>` };
@@ -632,9 +861,12 @@ function errorCopy(err) {
   if (kind === "NoFrames") {
     return { title: "The camera didn't start", body: `<p>The camera turned on but sent no picture. Close other apps that use it and try again.</p>` };
   }
-  if (/Could not load the|Failed to fetch|NetworkError|Load failed|network/i.test(String(err?.message || ""))) {
+  if (kind === "load" || /Could not load the|Failed to fetch|NetworkError|Load failed|network|Importing a module script failed|module script|dynamically imported module/i.test(String(err?.message || ""))) {
     return { title: "Couldn't load the lesson", body: `<p>Part of the app didn't download. Check your connection, then try again.</p>
       <p class="fineprint">${String(err?.message || err).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c])}</p>` };
+  }
+  if (/hand tracking model could not start|Hand tracking stopped working/i.test(String(err?.message || ""))) {
+    return { title: "The hand tracker stopped", body: `<p>The hand tracker couldn't keep running on this phone's graphics. Close other tabs and apps, then try again.</p>` };
   }
   return { title: "Something went wrong", body: `<p>${String(err?.message || err).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]).replace(/\n/g, "<br>")}</p>` };
 }
@@ -655,12 +887,13 @@ function fail(err) {
 /* ---- keeping the screen on, and coming back to the page ---------------------------------------------------------- */
 let wake = null;
 async function keepAwake() {
+  if (wake && !wake.released) return;
   try { wake = await navigator.wakeLock?.request("screen"); } catch { wake = null; }
 }
 function releaseAwake() { try { wake?.release(); } catch { /* already gone */ } wake = null; }
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
-  if (practising) { keepAwake(); if (!REPLAY.valid) resumeCamera(); }
+  if (stats.screen === "practice" && stream && !REPLAY.valid) { keepAwake(); resumeCamera(); }
   if (audio?.state === "suspended") audio.resume().catch(() => {});
 });
 // back to a page restored from the browser's memory: the camera is gone, start clean
@@ -700,55 +933,96 @@ function stageMessage(text) {
   if (text) $("#stage-message-text").textContent = text;
 }
 let started = false;
-async function start() {
+/* `tapped`: called from a tap (the Start button). A page that starts by itself (after "I sign with my left hand", or the
+ * camera-flip offer) asks for one tap first: sound and the screen's wake lock are only granted inside a tap, and on an
+ * iPhone a signing learner never touches the screen again. */
+async function start(tapped = true) {
   if (started) return;
+  if (loadError && stats.screen === "welcome") { location.reload(); return; }
   started = true;
-  unlockAudio();
+  if (tapped) { keepAwake(); unlockAudio(); }
   if (planError) return fail(planError);
   show("practice");
   phase("setup");
   layout();
   try {
-    if (REPLAY.valid) {
-      stageMessage("Loading the recording…");
-      const data = await loadReplay(REPLAY.path);
-      ({ video: src, tracker } = createReplay(data));
-      stats.delegate = tracker.delegate;
-      sourceSize(src);
-      layout();
-      clock = createClock(src, data.fps);
-      stageMessage(null);
-    } else {
-      stageMessage("Starting your camera…");
-      $("#setup-status").textContent = "Tap Allow when your browser asks to use the camera.";
-      await openCamera();
-      sourceSize(video);
-      layout();
-      if (stats.loaded < 1) { stageWaiting = "tracker"; setLoad(stats.loaded); }
-      $("#setup-status").textContent = "Loading the hand tracker…";
-      tracker = await trackerReady;
-      stageWaiting = null;
-      stageMessage(null);
-      clock = createClock(video);
-      await cameraCheck();
-    }
-    let ready = false;
-    firstTrial.then(() => { ready = true; }, () => { ready = true; });
-    await new Promise((r) => setTimeout(r, 0));
-    if (!ready) stageMessage("Getting your first letter ready…");
-    await firstTrial;
-    stageMessage(null);
-    await practice();
+    if (!tapped) await waitForTap();
+    await session();
   } catch (err) {
     fail(err);
   }
 }
+async function waitForTap() {
+  const title = $("#setup-title"), status = $("#setup-status"), b = $("#btn-ready");
+  title.textContent = "Ready?";
+  status.textContent = `Tap Start, then hold up your ${HAND} hand.`;
+  b.hidden = false;
+  await new Promise((r) => b.addEventListener("click", r, { once: true }));
+  b.hidden = true;
+  title.textContent = `Hold up your ${HAND} hand`;
+  keepAwake();
+  unlockAudio();
+}
+/* The camera, the camera check and the letters (again from "Practice again", with the tracker kept). */
+async function session() {
+  if (REPLAY.valid) {
+    stageMessage("Loading the recording…");
+    const data = await loadReplay(REPLAY.path);
+    ({ video: src, tracker } = createReplay(data));
+    stats.delegate = tracker.delegate;
+    sourceSize(src);
+    layout();
+    clock = createClock(src, data.fps);
+    stageMessage(null);
+  } else {
+    if (loadError) throw loadError;
+    stageMessage("Starting your camera…");
+    $("#setup-status").textContent = "Tap Allow when your browser asks to use the camera.";
+    await openCamera();
+    sourceSize(video);
+    layout();
+    if (stats.loaded < 1) { stageWaiting = "tracker"; setLoad(stats.loaded); }
+    $("#setup-status").textContent = "Loading the hand tracker…";
+    tracker = await trackerReady;
+    stageWaiting = null;
+    stageMessage(null);
+    clock ??= createClock(video);
+    await cameraCheck();
+  }
+  let ready = false;
+  firstTrial.then(() => { ready = true; }, () => { ready = true; });
+  await sleep(0);
+  if (!ready) stageMessage("Getting your first letter ready…");
+  await firstTrial;
+  stageMessage(null);
+  await practice();
+}
+/* "Practice again": the same page and the same tracker (no download, no compile, no warm-up, no new page to grant the
+ * camera and sound to), the experiment's own files fetched again by nextTrial(0), the camera reopened inside the tap. */
+async function again() {
+  if (!tracker || REPLAY.valid) { location.reload(); return; }
+  keepAwake();
+  unlockAudio();
+  stats.summaries.length = 0;
+  stats.accepted.length = 0;
+  doneCount = 0;
+  setProgress(0);
+  firstTrial = exp.nextTrial(0);
+  firstTrial.catch(() => {});
+  show("practice");
+  phase("setup");
+  $("#setup-title").textContent = `Hold up your ${HAND} hand`;
+  layout();
+  try { await session(); } catch (err) { fail(err); }
+}
 
-$("#btn-start").addEventListener("click", start);
-$("#btn-skip").addEventListener("click", () => endCurrent?.("skipped"));
+$("#btn-start").addEventListener("click", () => start(true));
+// a double tap on Skip must not skip the next letter too
+$("#btn-skip").addEventListener("click", () => { if (performance.now() - trialStartedAt > 700) endCurrent?.("skipped"); });
 $("#btn-close").addEventListener("click", () => { $("#quit-sheet").hidden = false; $("#btn-keep").focus(); });
-$("#btn-keep").addEventListener("click", () => { $("#quit-sheet").hidden = true; });
-$("#quit-sheet").addEventListener("click", (e) => { if (e.target === e.currentTarget) $("#quit-sheet").hidden = true; });
+const closeSheet = () => { $("#quit-sheet").hidden = true; $("#btn-close").focus({ preventScroll: true }); };
+$("#btn-keep").addEventListener("click", closeSheet);
+$("#quit-sheet").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeSheet(); });
 $("#btn-quit").addEventListener("click", () => { stopCamera(); location.reload(); });
 $("#btn-sound").addEventListener("click", () => {
   soundOn = !soundOn;
@@ -756,26 +1030,29 @@ $("#btn-sound").addEventListener("click", () => {
   renderSound();
   if (soundOn) { unlockAudio(); chime("made"); }
 });
-$("#btn-again").addEventListener("click", () => {
-  try { sessionStorage.setItem(AUTOSTART_KEY, "1"); } catch { /* the welcome again, then */ }
-  location.reload();
-});
+$("#btn-again").addEventListener("click", () => again());
 $("#btn-retry").addEventListener("click", () => location.reload());
+/* Copy the link; where neither the clipboard nor a prompt works (many in-app browsers), show it to copy by hand. */
 async function copyLink() {
-  const url = location.href;
-  try { await navigator.clipboard.writeText(url); toast("Link copied"); }
-  catch { window.prompt("Copy this link:", url); }
+  const url = shareableUrl();
+  try { await navigator.clipboard.writeText(url); toast("Link copied"); return; } catch { /* below */ }
+  const box = $("#error-body");
+  if (document.body.dataset.screen === "error" && box && !box.querySelector(".link-out")) {
+    box.insertAdjacentHTML("beforeend", `<p>Copy this link: <code class="link-out"></code></p>`);
+    box.querySelector(".link-out").textContent = url;
+  } else {
+    toast(url);
+  }
 }
 $("#btn-copy").addEventListener("click", copyLink);
 $("#btn-copy-inapp").addEventListener("click", copyLink);
 $("#btn-share").addEventListener("click", async () => {
-  const url = location.origin + location.pathname + location.search.replace(/([?&])srcmirror=1&?/, "$1").replace(/[?&]$/, "");
+  const url = shareableUrl();
   if (navigator.share) {
     try { await navigator.share({ title: "Fingerspelling practice", text: "Practice fingerspelling with your phone's camera.", url }); return; }
     catch (err) { if (err?.name === "AbortError") return; }
   }
-  try { await navigator.clipboard.writeText(url); toast("Link copied"); }
-  catch { window.prompt("Copy this link:", url); }
+  copyLink();
 });
 
 /* The camera-flip offer (asl-demo.js showFlipOffer) reloads the page with ?srcmirror=1: carry on straight into the
@@ -783,8 +1060,14 @@ $("#btn-share").addEventListener("click", async () => {
 document.addEventListener("click", (e) => {
   if (e.target?.closest?.(".demo-flip-btn")) { try { sessionStorage.setItem(AUTOSTART_KEY, "1"); } catch { /* welcome again */ } }
 }, true);
-// the first tap anywhere opens the audio path (a page started without a tap, or audio interrupted by a call)
-addEventListener("pointerdown", () => { if (!audio || audio.state !== "running") unlockAudio(); }, { passive: true });
+// a tap (touchend / click carry the user activation; pointerdown does not) opens the audio path, after a page that
+// started without one or audio interrupted by a call, and asks for the wake lock again while there is a camera
+for (const type of ["touchend", "click"]) {
+  addEventListener(type, () => {
+    if (!audio || audio.state !== "running") unlockAudio();
+    if (stream && (!wake || wake.released)) keepAwake();
+  }, { passive: true, capture: true });
+}
 
 renderSound();
 renderWelcome();
@@ -793,5 +1076,6 @@ $("#btn-start").textContent = "Start";
 let autostart = false;
 try { autostart = sessionStorage.getItem(AUTOSTART_KEY) === "1"; sessionStorage.removeItem(AUTOSTART_KEY); } catch { /* none */ }
 // ?autostart=1: straight past the welcome (for driving the page where nothing can tap it, like a simulator)
-if ((autostart && !REPLAY.present) || params.get("autostart") === "1") start();
+if (params.get("autostart") === "1") start(true);
+else if (autostart && !REPLAY.present) start(false);
 if (REPLAY.present && !REPLAY.valid) fail(new Error(`?replay=${REPLAY.raw} is not a usable replay path.`));

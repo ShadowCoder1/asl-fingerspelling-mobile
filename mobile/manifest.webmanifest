@@ -4,8 +4,7 @@
   "description": "Practice fingerspelling with your phone's camera: it checks your handshape and shows you what to change.",
   "start_url": "../",
   "scope": "../",
-  "display": "standalone",
-  "orientation": "portrait",
+  "display": "browser",
   "background_color": "#faf7f2",
   "theme_color": "#faf7f2",
   "icons": [

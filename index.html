@@ -9,8 +9,6 @@
 <meta name="theme-color" content="#faf7f2">
 <meta name="color-scheme" content="light">
 <meta name="format-detection" content="telephone=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Fingerspell">
 <title>Fingerspelling practice</title>
 <meta name="description" content="Practice fingerspelling with your phone's camera: it checks your handshape and shows you what to change.">
@@ -33,7 +31,53 @@
 <link rel="preload" href="assets/fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/tutor.css">
 <link rel="stylesheet" href="mobile/app.css">
-<script type="module" src="mobile/app.js"></script>
+<!-- If the app's code cannot load (a dropped connection), Start says so and reloads, instead of staying "Loading…". -->
+<script>
+function bootFail() {
+  var b = document.getElementById("btn-start");
+  if (!b || !b.disabled || window.__mobile) return;
+  b.disabled = false; b.textContent = "Couldn't load. Tap to try again";
+  b.onclick = function () { location.reload(); };
+}
+setTimeout(bootFail, 25000);
+</script>
+<script type="module" src="mobile/app.js" onerror="bootFail()"></script>
+<!-- the whole module graph at once, instead of one level of imports per round trip -->
+<link rel="modulepreload" href="mobile/app.js">
+<link rel="modulepreload" href="tutor/landmarks.js">
+<link rel="modulepreload" href="tutor/vec.js">
+<link rel="modulepreload" href="tutor/hand-frame.js">
+<link rel="modulepreload" href="tutor/features.js">
+<link rel="modulepreload" href="tutor/linalg.js">
+<link rel="modulepreload" href="tutor/verifier.js">
+<link rel="modulepreload" href="tutor/openfs.js">
+<link rel="modulepreload" href="tutor/letters.js">
+<link rel="modulepreload" href="tutor/commit.js">
+<link rel="modulepreload" href="tutor/blame.js">
+<link rel="modulepreload" href="tutor/motion.js">
+<link rel="modulepreload" href="tutor/feedback.js">
+<link rel="modulepreload" href="experiments/asl-tutor/flow.js">
+<link rel="modulepreload" href="tutor/mix.js">
+<link rel="modulepreload" href="experiments/asl-tutor/engine.js">
+<link rel="modulepreload" href="experiments/asl-tutor/ui.js">
+<link rel="modulepreload" href="experiments/asl-tutor/debug-recording.js">
+<link rel="modulepreload" href="experiments/asl-tutor/debug.js">
+<link rel="modulepreload" href="experiments/asl-tutor/ghost.js">
+<link rel="modulepreload" href="experiments/asl-tutor/picture-ghost.js">
+<link rel="modulepreload" href="experiments/asl-tutor/glove.js">
+<link rel="modulepreload" href="experiments/asl-tutor/coach.js">
+<link rel="modulepreload" href="experiments/asl-tutor/focus.js">
+<link rel="modulepreload" href="experiments/asl-tutor/meters.js">
+<link rel="modulepreload" href="experiments/asl-tutor/notes-view.js">
+<link rel="modulepreload" href="experiments/asl-tutor/motion-guide.js">
+<link rel="modulepreload" href="tutor/pick-hand.js">
+<link rel="modulepreload" href="config.js">
+<link rel="modulepreload" href="js/core/firebase.js">
+<link rel="modulepreload" href="experiments/asl-demo.js">
+<link rel="modulepreload" href="js/core/tracker.js">
+<link rel="modulepreload" href="js/core/trial-loop.js">
+<link rel="modulepreload" href="js/core/replay.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs" crossorigin>
 </head>
 <body data-screen="welcome">
 
@@ -41,16 +85,20 @@
 <section class="screen screen-welcome" id="welcome" aria-labelledby="welcome-title">
   <div class="welcome-inner">
     <p class="pill"><span aria-hidden="true">✋</span> Research prototype</p>
-    <div class="hero" id="hero" aria-hidden="true"></div>
-    <h1 id="welcome-title">Fingerspell <span id="welcome-letters">L, X and G</span></h1>
+    <div class="hero" id="hero" aria-hidden="true" data-default="LXG">
+      <div class="hero-tile hero-glove"><img src="assets/gloves/L.png" alt="" fetchpriority="high"><b>L</b></div>
+      <div class="hero-tile hero-glove"><img src="assets/gloves/X.png" alt="" fetchpriority="high"><b>X</b></div>
+      <div class="hero-tile hero-glove"><img src="assets/gloves/G.png" alt="" fetchpriority="high"><b>G</b></div>
+    </div>
+    <h1 id="welcome-title" tabindex="-1">Fingerspell <span id="welcome-letters">L, X and G</span></h1>
     <p class="lede" id="welcome-lede">Make each letter with your right hand. Your camera checks your handshape and shows you what to change, as you go.</p>
     <ol class="steps">
       <li><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span>
-        <span>Prop your phone up, or hold it in your other hand at arm's length.</span></li>
+        <span>Hold your phone in your <b id="step-phone-hand">left</b> hand at arm's length, or prop it up.</span></li>
       <li><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12m0-1V4a1.5 1.5 0 0 1 3 0v7m0-.5V5.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6.5 7S6 18.5 5 16l-1.6-3.3a1.4 1.4 0 0 1 2.4-1.4L8 14"/></svg></span>
-        <span id="step-fit">Fit your <b id="step-hand">right</b> hand into the <span id="step-shape">glove</span> on screen.</span></li>
+        <span id="step-fit">Fit your <b id="step-hand">right</b> hand into the <span class="shape-word">glove</span> on screen. The blue lines are your hand.</span></li>
       <li><span class="step-icon step-icon-good" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16.5 9"/></svg></span>
-        <span>When it turns green, hold still until the circle fills.</span></li>
+        <span>When the <span class="shape-word">glove</span> turns green, hold still until the ring around the letter fills.</span></li>
     </ol>
     <p class="inapp" id="inapp-note" hidden>
       This page needs your camera, which apps like this one often block. If it doesn't work, open it in
@@ -76,7 +124,7 @@
     <div class="progress" id="progress" role="progressbar" aria-label="Letters done" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0">
       <div class="progress-fill progress-zero" id="progress-fill"></div>
     </div>
-    <button type="button" class="icon-btn" id="btn-sound" aria-label="Sound is on" aria-pressed="true">
+    <button type="button" class="icon-btn" id="btn-sound" aria-label="Sound" aria-pressed="true">
       <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-sound-on"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>
       <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-sound-off"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
     </button>
@@ -89,7 +137,7 @@
           <video id="cam" playsinline muted autoplay disablepictureinpicture></video>
           <canvas id="overlay"></canvas>
         </div>
-        <div class="hud" id="hud"></div>
+        <div class="hud" id="hud"><p class="hud-note" id="hud-note" hidden>Bring your hand closer to the camera</p></div>
         <div class="stage-message" id="stage-message" hidden>
           <div class="spinner" aria-hidden="true"></div>
           <p id="stage-message-text">Starting your camera…</p>
@@ -104,6 +152,7 @@
         <p class="setup-title" id="setup-title">Hold up your right hand</p>
         <p class="setup-status" id="setup-status" aria-live="polite">Starting your camera…</p>
         <div id="position-stage-slot"></div>
+        <button type="button" class="btn btn-primary setup-ready" id="btn-ready" hidden>Start</button>
       </div>
       <!-- the tutor's own panel (experiments/asl-tutor/ui.js mountTutor): the letter and its ring and the picture are
            moved onto the camera view (app.js), what the tutor says stays here -->
@@ -119,7 +168,7 @@
 <section class="screen screen-results" id="results" aria-labelledby="results-title">
   <div class="results-inner">
     <div class="trophy" id="trophy" aria-hidden="true"></div>
-    <h1 id="results-title">Nice work!</h1>
+    <h1 id="results-title" tabindex="-1">Nice work!</h1>
     <p class="lede" id="results-lede"></p>
     <ul class="result-list" id="result-list"></ul>
   </div>
@@ -136,7 +185,7 @@
     <div class="error-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h2l1.5-2h6l1.5 2h2A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12" r="3.5"/></svg>
     </div>
-    <h1 id="error-title">We couldn't start your camera</h1>
+    <h1 id="error-title" tabindex="-1">We couldn't start your camera</h1>
     <div class="error-body" id="error-body"></div>
   </div>
   <div class="error-cta">
@@ -156,6 +205,7 @@
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<p class="visually-hidden" id="announce" role="status" aria-live="polite"></p>
 <noscript><p class="noscript">This page needs JavaScript to use your camera.</p></noscript>
 </body>
 </html>

@@ -123,6 +123,20 @@
  * exact same attempts every time. See push() for why `tMs` must never go
  * backwards, and reset() for how a new trial's clock is allowed to restart. */
 import { toPoints, medianFlat } from "./landmarks.js";
+
+/* The committer's geometry in units of the picture's SHORT side. toPoints measures in picture heights, and two floors
+ * here are absolute in those units (minPalm, absTol): on a phone held upright, whose camera sends 480 x 640, a height
+ * is 640 px, so the same hand at the same distance had to be a third bigger in pixels than on a laptop's 640 x 480
+ * before a hold could start (the phone version's review, 22 Oct: a propped-up phone got a green glove and a ring that
+ * never filled). A landscape picture's short side IS its height, so nothing changes there; an upright one is measured
+ * in its width, the same 480 px. Everything else here is relative to the palm, so only those two floors move. */
+function pointsOf(flat, aspect) {
+  const P = toPoints(flat, aspect);
+  if (!(aspect < 1)) return P;
+  const k = 1 / aspect;
+  for (const p of P) { p[0] *= k; p[1] *= k; p[2] *= k; }
+  return P;
+}
 import { palmSize } from "./hand-frame.js";
 
 // MediaPipe's z is triangulated from a single 2-D view rather than measured
@@ -424,7 +438,7 @@ export function createCommitter(opts = {}) {
   // filling up) -- medianFlat already handles any count gracefully.
   function smoothedPose(rows, aspect) {
     if (rows.length === 0) return null;
-    return toPoints(medianFlat(rows), aspect);
+    return pointsOf(medianFlat(rows), aspect);
   }
 
   // Purely a function of (armed, inStillPeriod, periodStart, lastPushT): it
@@ -525,7 +539,7 @@ export function createCommitter(opts = {}) {
     }
     lastPushT = tMs;
 
-    const points = flat === null ? null : toPoints(flat, aspect);
+    const points = flat === null ? null : pointsOf(flat, aspect);
     const { present: hasHand, S: rawS } = frameStatus(points);
     // Fix round 3: the minPalm gate reads a SMOOTHED size (median of the
     // last SMOOTH_N usable frames' raw palmSize), not this one frame's, and
@@ -687,7 +701,7 @@ export function createCommitter(opts = {}) {
         const medianRow = medianFlat(history);
         if (medianRow !== null) {
           committed = { tStart: periodStart, tCommit: tMs, flat: medianRow, handPresentFrac: handFrames / totalFrames, frames: totalFrames };
-          committedPose = toPoints(medianRow, aspect);
+          committedPose = pointsOf(medianRow, aspect);
           lastCommitT = tMs;
           armed = false;
           armRows = [];

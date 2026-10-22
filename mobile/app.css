@@ -71,28 +71,37 @@ body[data-screen="practice"] #practice { display: flex; }
 }
 .welcome-inner, .results-inner, .error-inner { flex: 1 0 auto; display: flex; flex-direction: column; gap: 14px; }
 .welcome-cta, .results-cta, .error-cta { flex: none; display: flex; flex-direction: column; gap: 12px; padding-top: 18px; }
+/* Safari's toolbar covers the bottom of the page: Start, the progress and the privacy line stay on screen */
+.screen-welcome { padding-bottom: 0; }
+.welcome-cta {
+  position: sticky; bottom: 0; z-index: 2;
+  margin: 0 -22px; padding: 14px 22px calc(var(--safe-b) + 12px);
+  background: linear-gradient(rgba(250, 247, 242, 0), var(--bg) 22px);
+}
 
 /* ---- buttons ----------------------------------------------------------------------------------------------------- */
 .btn {
   display: block; width: 100%; min-height: 54px; padding: 12px 18px;
   border: 0; border-radius: 16px; cursor: pointer;
-  font-size: 1.08rem; font-weight: 800; letter-spacing: 0.02em;
+  font-size: 1.1rem; font-weight: 800; letter-spacing: 0.02em;
   transition: transform .08s ease, box-shadow .08s ease, background-color .15s ease;
   user-select: none; -webkit-user-select: none;
 }
 .btn-primary { background: var(--good); color: #fff; box-shadow: 0 4px 0 var(--good-deep); }
 .btn-primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--good-deep); }
-.btn-primary:disabled { background: #9fcdb8; box-shadow: 0 4px 0 #86b8a2; cursor: default; transform: none; }
+.btn-primary:disabled { background: var(--good-soft); color: var(--good-deep); box-shadow: 0 4px 0 #cfe9dc; cursor: default; transform: none; }
 .btn-secondary { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 2px var(--line), 0 4px 0 var(--line); }
 .btn-secondary:active { transform: translateY(3px); box-shadow: inset 0 0 0 2px var(--line), 0 1px 0 var(--line); }
 .btn-ghost { background: transparent; color: var(--subtle); min-height: 44px; font-weight: 700; box-shadow: none; }
 .btn-ghost:active { background: var(--soft); }
 .btn-danger { color: var(--bad); }
-.btn:focus-visible, .icon-btn:focus-visible, .link-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.btn:focus-visible, .icon-btn:focus-visible, .link-btn:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 3px; }
+h1:focus { outline: none; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .link-btn { background: none; border: 0; padding: 0; color: #2456c9; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .icon-btn {
   flex: none; width: 44px; height: 44px; display: grid; place-items: center;
-  background: transparent; border: 0; border-radius: 12px; cursor: pointer; color: #9a9389;
+  background: transparent; border: 0; border-radius: 12px; cursor: pointer; color: var(--subtle);
 }
 .icon-btn:active { background: var(--soft); }
 .icon-btn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -105,9 +114,9 @@ body[data-screen="practice"] #practice { display: flex; }
   align-self: flex-start; margin: 0; padding: 4px 12px; border-radius: 999px;
   background: var(--soft); color: var(--subtle); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.03em;
 }
-.hero { display: flex; justify-content: center; align-items: flex-end; gap: 10px; min-height: 150px; margin: 6px 0 4px; }
+.hero { display: flex; justify-content: center; align-items: flex-end; gap: 10px; min-height: 124px; margin: 4px 0 2px; }
 .hero-tile {
-  position: relative; width: min(29%, 118px); aspect-ratio: 1 / 1.08; border-radius: 22px;
+  position: relative; width: min(28%, 108px); aspect-ratio: 1 / 1.08; border-radius: 22px;
   background: var(--panel); box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
   display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 8px 6px;
   animation: float 3.2s ease-in-out infinite;
@@ -159,7 +168,8 @@ body[data-screen="practice"] #practice { display: flex; }
 .practice-main { justify-content: center; }
 .setup-card, #exp-mount { flex: 1 1 auto; min-height: 0; }
 #exp-mount .tutor, #exp-mount .tutor-panel, #exp-mount .tutor-main { height: 100%; }
-#exp-mount .tutor-main, .setup-card { overflow-y: auto; scrollbar-width: none; }
+#exp-mount .tutor-main, .setup-card { overflow-y: auto; justify-content: flex-start; }
+#exp-mount .tutor-main::before, #exp-mount .tutor-main::after, .setup-card::before, .setup-card::after { content: ""; flex: 1 1 0; }
 
 #stage {
   position: relative; flex: none;
@@ -178,7 +188,7 @@ html.src-mirror #overlay { transform: scaleX(-1); }
 
 .stage-message {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-  background: rgba(27, 25, 22, 0.55); color: #fff; text-align: center; padding: 24px; font-weight: 700;
+  background: rgba(27, 25, 22, 0.68); color: #fff; text-align: center; padding: 24px; font-weight: 700;
 }
 .stage-message p { margin: 0; max-width: 260px; }
 .spinner { width: 34px; height: 34px; border-radius: 50%; border: 4px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; animation: spin 0.9s linear infinite; }
@@ -186,30 +196,40 @@ html.src-mirror #overlay { transform: scaleX(-1); }
 .perf { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.55); color: #fff; font: 600 11px/1.4 ui-monospace, Menlo, monospace; white-space: nowrap; pointer-events: none; }
 
 /* the letter with its hold ring, and the letter's picture, on the camera view (moved here by app.js) */
-.hud { position: absolute; inset: 0; pointer-events: none; }
+.hud { position: absolute; inset: 0; pointer-events: none; --hud-ring: 76px; --hud-ring: clamp(66px, 21cqw, 92px); }
 body:not(.phase-practice) .hud { visibility: hidden; }
 .hud .tutor-cue-wrap {
   position: absolute; top: 10px; left: 10px;
-  --ring: clamp(66px, 21cqw, 92px);
+  --ring: var(--hud-ring);
   width: var(--ring); height: var(--ring);
   background: rgba(255, 255, 255, 0.95); border-radius: 50%;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
 .hud .tutor-ring { width: 100%; height: 100%; }
 .hud .tutor-ring-track, .hud .tutor-ring-fill { stroke-width: 10; }
+.hud .tutor-ring-track { stroke: #dcd4c6; }
 .hud .tutor-cue { font-size: calc(var(--ring) * 0.54); color: var(--text); }
 .hud .tutor-cue.cue-in { animation: cue-in 420ms cubic-bezier(.2, .9, .3, 1.3) 1; }
 @keyframes cue-in { 0% { transform: scale(0.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 .hud .tutor-paused .tutor-ring { opacity: 0.4; }
 .hud .tutor-reference {
-  position: absolute; top: 10px; right: 10px; margin: 0;
-  width: clamp(70px, 23cqw, 112px); padding: 6px;
+  position: absolute; top: 10px; left: calc(18px + var(--hud-ring)); margin: 0;
+  width: 86px; width: clamp(70px, 23cqw, 112px); padding: 6px;
   background: rgba(255, 255, 255, 0.95); border: 0; border-radius: 16px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
   display: flex; flex-direction: column; align-items: center; gap: 0;
 }
 .hud .tutor-picture { display: block; width: 100%; height: auto; padding: 0; border: 0; border-radius: 10px; background: #fff; }
 .hud .tutor-caption, .hud .tutor-describe, .hud .tutor-mnemonic { display: none !important; }
+/* a left-handed session has its glove on the left: the letter and picture go right */
+html.hand-left .hud .tutor-cue-wrap { left: auto; right: 10px; }
+html.hand-left .hud .tutor-reference { left: auto; right: calc(18px + var(--hud-ring)); }
+/* the ring will not start while the hand is this small (app.js createSizeWatch) */
+.hud-note {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); margin: 0; max-width: 90%;
+  padding: 8px 14px; border-radius: 999px; background: #fff7e6; color: #7a4b00; font-weight: 800; font-size: 0.95rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); text-align: center;
+}
 
 /* what the tutor says: one card under the camera */
 #exp-mount { display: block; }
@@ -219,7 +239,7 @@ body:not(.phase-practice) #exp-mount, body:not(.phase-practice) .practice-action
 #exp-mount .tutor-debug { display: none !important; }
 #exp-mount .tutor-panel { gap: 0; }
 #exp-mount .tutor-main, .setup-card {
-  gap: 4px; padding: 12px 16px; min-height: 104px; justify-content: center;
+  gap: 4px; padding: 12px 16px; min-height: 104px; justify-content: flex-start;
   background: var(--panel); border: 0; border-radius: 20px; box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
   text-align: center;
 }
@@ -232,17 +252,18 @@ body:not(.phase-practice) #exp-mount, body:not(.phase-practice) .practice-action
 #exp-mount .tutor-status[data-state="fix"] { color: #b45309; }
 #exp-mount .tutor-status[data-state="match"], #exp-mount .tutor-status[data-state="accepted"] { color: #15803d; }
 .practice-actions { display: flex; justify-content: center; }
-.practice-actions .btn { width: auto; padding: 8px 18px; min-height: 40px; font-size: 0.95rem; }
+.practice-actions .btn { width: auto; padding: 8px 18px; min-height: 44px; font-size: 0.95rem; }
 
 .setup-card { display: flex; flex-direction: column; align-items: center; }
 body:not(.phase-setup) .setup-card { display: none; }
 .setup-title { margin: 0; font-size: 1.2rem; font-weight: 800; }
 .setup-status { margin: 0; color: var(--subtle); font-weight: 700; }
-.setup-status.good { color: var(--good); }
+.setup-status.good { color: var(--good-deep); }
 .setup-status.bad { color: #b45309; }
 .setup-card .demo-flip { margin: 8px 0 0; font-size: 0.9rem; }
 html.is-phone .setup-card .demo-flip { display: none !important; }
-.setup-card .other-hand { width: auto; min-height: 40px; margin-top: 4px; padding: 6px 14px; font-size: 0.95rem; color: #2456c9; text-decoration: underline; }
+.setup-card .other-hand { width: auto; min-height: 44px; margin-top: 4px; padding: 6px 14px; font-size: 0.95rem; color: #2456c9; text-decoration: underline; }
+.setup-card .setup-ready { width: auto; min-width: 160px; margin-top: 8px; }
 .setup-card .demo-flip-btn { font-size: 0.95rem; }
 
 /* ---- landscape (a phone on its side, a tablet, a laptop): the words beside the camera ---------------------------- */
@@ -258,8 +279,11 @@ html.is-phone .setup-card .demo-flip { display: none !important; }
 @media (min-width: 1000px) and (orientation: landscape) {
   .screen-practice { max-width: 1240px; margin: 0 auto; }
   .topbar { height: 64px; padding: 0 16px; }
-  .hud .tutor-cue-wrap { --ring: clamp(80px, 15cqw, 120px); top: 14px; left: 14px; }
-  .hud .tutor-reference { width: clamp(96px, 16cqw, 150px); top: 14px; right: 14px; }
+  .hud { --hud-ring: 100px; --hud-ring: clamp(80px, 15cqw, 120px); }
+  .hud .tutor-cue-wrap { top: 14px; left: 14px; }
+  .hud .tutor-reference { width: 120px; width: clamp(96px, 16cqw, 150px); top: 14px; left: calc(24px + var(--hud-ring)); }
+  html.hand-left .hud .tutor-cue-wrap { left: auto; right: 14px; }
+  html.hand-left .hud .tutor-reference { left: auto; right: calc(24px + var(--hud-ring)); }
   #exp-mount .tutor-status { font-size: 1.25rem; }
 }
 

@@ -48,6 +48,11 @@ import { createHandPicker, handSide } from "../tutor/pick-hand.js";
 import { configLooksUnfilled } from "../js/core/firebase.js";
 
 export const DEMO_VERSION = "asl-demo/3";
+/* What loadEverything prepares. pictureArtForGloveLetters: the outline art of a letter that has a glove is built too,
+ * though with the glove look it is never drawn (the laptop has always built it). The phone version (mobile/app.js) turns
+ * it off: rasterising and schematizing each picture is a long task on a phone's main thread. Drawing and grading are the
+ * same either way. */
+export const LOAD = { pictureArtForGloveLetters: true };
 const MODEL_PATH = "tutor/model.json";
 const GHOST_PATH = "tutor/ghost-hands.json";
 const PICTURES_PATH = "tutor/ghost-pictures.json";
@@ -528,9 +533,10 @@ async function loadEverything() {
   session.ghost = createGhost(ghosts.letters);
   session.picture = createPictureGhost({ points: pictures.letters, templates: ghosts.letters, hand: HAND, follow: FOLLOW,
     style: LOOK_STYLE === "picture" ? "picture" : "outline" });
-  if (LOOK_STYLE !== "hand") await session.picture.load(session.letters, pictureUrl);
+  const gloves = LOOK_STYLE === "glove" ? await get(GLOVES_PATH, "gloves") : null;
+  const pictureLetters = gloves && !LOAD.pictureArtForGloveLetters ? session.letters.filter((L) => !gloves.letters?.[L]) : session.letters;
+  if (LOOK_STYLE !== "hand") await session.picture.load(pictureLetters, pictureUrl);
   if (LOOK_STYLE === "glove") {
-    const gloves = await get(GLOVES_PATH, "gloves");
     session.glove = createGloveGhost({ gloves: gloves.letters, hand: HAND });
     await session.glove.load(session.letters);
   }
