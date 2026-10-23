@@ -148,9 +148,10 @@ const LOOK_STYLE = ["outline", "picture", "hand", "plain"].includes(params.get("
 /* ?look=plain (the phone version's version without a glove, 22 Oct; the owner: "the simple clean version where it shows
  * them the letter and they sign it ... none of the yellow feedback"; "i want the pose diagram on the hand"): nothing
  * drawn to fit the hand into and no live coaching -- the letter, its picture, the learner's own hand skeleton and the
- * hold ring; a hold that is not the letter is answered "Not quite. Try again." instead of what to change. When a hold is taken and how it is graded are exactly as in the other looks. */
+ * hold ring. A hold that is not the letter is answered as in every look -- the letter it looks like and what to change
+ * (the owner, 23 Oct: "on the glove version it tells you what letter you made by accident and what to fix ... they are
+ * supposed to be the same"). When a hold is taken and how it is graded are exactly as in the other looks. */
 const PLAIN = LOOK_STYLE === "plain";
-export const PLAIN_RETRY = "Not quite. Try again.";
 const gloveFor = (letter) => LOOK_STYLE === "glove" && !!session?.glove?.has(letter);
 const shapeWord = () => (LOOK_STYLE === "glove" ? "glove" : "outline");
 // The picture stays in one spot for the hand to fit into (the owner, 19 Oct); ?follow=1 puts it on the hand instead.
@@ -575,7 +576,7 @@ function applyEffects(effects, { trial, addEvent, endTrial }) {
     switch (e.kind) {
       case "cue": view.cue(e); break;
       case "feedback":
-        view.feedback(PLAIN && e.tone === "correction" ? { ...e, text: PLAIN_RETRY, tone: "neutral" } : e, trial.letter);
+        view.feedback(e, trial.letter);
         if (e.tone === "correct") {
           session.coach.accepted(); setLive(session.coach.look); session.glove?.celebrate(performance.now());
           if (PLAIN) session.celebratedAt = performance.now();
